@@ -22,6 +22,22 @@ from sqlalchemy import Boolean, Column, ForeignKey, Integer, String
 from quantum.db.models_v2 import model_base
 
 
+class Test(model_base.BASEV2):
+    """Represents allocation state of vlan_id on physical network"""
+    __tablename__ = 'ovs_test'
+
+    test_col1 = Column(String(64), nullable=False, primary_key=True)
+    test_col2 = Column(Integer, nullable=False, primary_key=True,
+                     autoincrement=False)
+
+    def __init__(self, test1, test2):
+        self.test_col1 = test1
+        self.test_col2 = test2
+
+    def __repr__(self):
+        return "<Test(%s,%d)>" % (self.test_col1,
+                                               self.test_col2)
+
 class VlanAllocation(model_base.BASEV2):
     """Represents allocation state of vlan_id on physical network"""
     __tablename__ = 'ovs_vlan_allocations'
