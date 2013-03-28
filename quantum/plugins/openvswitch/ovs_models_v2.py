@@ -41,6 +41,7 @@ class TunnelBinding(model_base.BASEV2):
         return "<TunnelBinding(%s,%s)>" % (self.network_id,
                                                self.ip_address)
 
+
 class VlanAllocation(model_base.BASEV2):
     """Represents allocation state of vlan_id on physical network"""
     __tablename__ = 'ovs_vlan_allocations'
