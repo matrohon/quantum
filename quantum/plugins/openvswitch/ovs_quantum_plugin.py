@@ -174,6 +174,7 @@ class OVSRpcCallbacks(dhcp_rpc_base.DhcpRpcCallbackMixin,
         entry['endpoints'] = endpoints
         
         return entry
+
         
 class AgentNotifierApi(proxy.RpcProxy,
                        sg_rpc.SecurityGroupAgentRpcApiMixin):
