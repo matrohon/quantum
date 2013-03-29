@@ -380,3 +380,10 @@ def add_tunnel_endpoint(ip):
         session.add(tunnel)
         session.flush()
     return tunnel
+
+def add_tunnel_binding(net_id, tun_ip):
+    session = db.get_session()
+    with session.begin(subtransactions=True):
+        binding = ovs_models_v2.TunnelBinding(net_id, tun_ip)
+        session.add(binding)
+    
