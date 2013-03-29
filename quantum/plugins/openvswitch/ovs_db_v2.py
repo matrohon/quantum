@@ -399,3 +399,4 @@ def get_segment_endpoints(net_id):
     for endpoint in endpoints :
         LOG.debug(_("tunnel endpoint=%s"), endpoint.id)
     return [endpoint.id for endpoint in endpoints]
+

@@ -168,7 +168,7 @@ class OVSRpcCallbacks(dhcp_rpc_base.DhcpRpcCallbackMixin,
         
         ovs_db_v2.add_tunnel_binding(net_id, tunnel_ip)
         LOG.debug(_("tunnel binding added to DB"))
-        
+       
         endpoints = ovs_db_v2.get_segment_endpoints(net_id)
         entry = dict()
         entry['endpoints'] = endpoints
