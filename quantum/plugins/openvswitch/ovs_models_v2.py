@@ -22,21 +22,24 @@ from sqlalchemy import Boolean, Column, ForeignKey, Integer, String
 from quantum.db.models_v2 import model_base
 
 
-class Test(model_base.BASEV2):
-    """Represents allocation state of vlan_id on physical network"""
-    __tablename__ = 'ovs_test'
+class TunnelBinding(model_base.BASEV2):
+    """Represents bindings between tunnel segments and tunnel endpoints"""
+    __tablename__ = 'ovs_tunnel_bindings'
 
-    test_col1 = Column(String(64), nullable=False, primary_key=True)
-    test_col2 = Column(Integer, nullable=False, primary_key=True,
-                     autoincrement=False)
+    network_id = Column(String(36),
+                        ForeignKey('networks.id', ondelete="CASCADE"),
+			primary_key=True)
+    ip_address = Column(String(64),
+			ForeignKey('ovs_tunnel_endpoints.ip_address', ondelete="CASCADE"),
+			primary_key=True)
 
-    def __init__(self, test1, test2):
-        self.test_col1 = test1
-        self.test_col2 = test2
+    def __init__(self, network_id, ip_address):
+        self.network_id = network_id
+        self.ip_address = ip_address
 
     def __repr__(self):
-        return "<Test(%s,%d)>" % (self.test_col1,
-                                               self.test_col2)
+        return "<TunnelBinding(%s,%s)>" % (self.network_id,
+                                               self.ip_address)
 
 class VlanAllocation(model_base.BASEV2):
     """Represents allocation state of vlan_id on physical network"""
