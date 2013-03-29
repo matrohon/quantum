@@ -318,6 +318,7 @@ class OVSQuantumAgent(sg_rpc.SecurityGroupAgentRpcCallbackMixin):
                 #                     segmentation_id)
                 #TODO bp/ovs-tunnel-partial-mesh
                 #Ask plugin what tunnel endpoint is bound to this GRE overlay ID
+                self.plugin_rpc.tunnel_add_segment_endpoint(net_uuid, self.local_ip)
                 
                 # inbound bcast/mcast
                 self.tun_br.add_flow(

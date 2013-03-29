@@ -161,7 +161,12 @@ class OVSRpcCallbacks(dhcp_rpc_base.DhcpRpcCallbackMixin,
         # Return the list of tunnels IP's to the agent
         return entry
 
-
+    def tunnel_add_segment_endpoint(self, rpc_context, **kwargs):
+        net_id = kwargs.get('net_id')
+        tunnel_ip = kwargs.get('tunnel_ip')
+        LOG.debug(_("net_id : %s; tunnel_ip : %s"), net_id, tunnel_ip)
+        
+        
 class AgentNotifierApi(proxy.RpcProxy,
                        sg_rpc.SecurityGroupAgentRpcApiMixin):
     '''Agent side of the openvswitch rpc API.
