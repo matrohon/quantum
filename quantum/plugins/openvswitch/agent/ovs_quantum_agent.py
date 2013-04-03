@@ -324,7 +324,6 @@ class OVSQuantumAgent(sg_rpc.SecurityGroupAgentRpcCallbackMixin):
                 endpoints = entry['endpoints']
                 for i in endpoints:
                     LOG.debug(_("endpoints for segmentation id %(segmentation_id) : %(i) ")
-
                 
                 # inbound bcast/mcast
                 self.tun_br.add_flow(
