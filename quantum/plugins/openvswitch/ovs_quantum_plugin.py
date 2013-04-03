@@ -171,6 +171,12 @@ class OVSRpcCallbacks(dhcp_rpc_base.DhcpRpcCallbackMixin,
         ovs_db_v2.add_tunnel_binding(net_id, tunnel_ip)
         LOG.debug(_("tunnel binding added to DB"))
         
+        endpoints = ovs_db_v2.get_segment_endpoints(net_id)
+        entry = dict()
+        entry['endpoints'] = endpoints
+        
+        return entry
+        
 class AgentNotifierApi(proxy.RpcProxy,
                        sg_rpc.SecurityGroupAgentRpcApiMixin):
     '''Agent side of the openvswitch rpc API.
