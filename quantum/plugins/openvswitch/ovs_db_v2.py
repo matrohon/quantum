@@ -387,3 +387,15 @@ def add_tunnel_binding(net_id, tun_ip):
         binding = ovs_models_v2.TunnelBinding(net_id, tun_ip)
         session.add(binding)
     
+def get_segment_endpoints(net_id):
+    #get endpoint ip for this tunnel from ovs_tunnel_bindings
+    #get endpint gre id for every endpoint ip from tunnel_endpoints
+    #retunr the gre id list
+    session = db.get_session()
+    try:
+        endpoints = session.query(ovs_models_v2.TunnelEndpoint.id).join(ovs_models_v2.TunnelBinding).filter_by(network_id=net_id).all()
+    except exc.NoResultFound:
+        return []
+    for endpoint in endpoints :
+        LOG.debug(_("tunnel endpoint=%s"), endpoint.id)
+    return [endpoint.id for endpoint in endpoints]

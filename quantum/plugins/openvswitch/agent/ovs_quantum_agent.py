@@ -312,15 +312,18 @@ class OVSQuantumAgent(sg_rpc.SecurityGroupAgentRpcCallbackMixin):
         if network_type == constants.TYPE_GRE:
             if self.enable_tunneling:
                 # outbound
-                #self.tun_br.add_flow(priority=4, in_port=self.patch_int_ofport,
-                #                     dl_vlan=lvid,
-                #                     actions="set_tunnel:%s,normal" %
-                #                     segmentation_id)
+                self.tun_br.add_flow(priority=4, in_port=self.patch_int_ofport,
+                                     dl_vlan=lvid,
+                                     actions="set_tunnel:%s,normal" %
+                                     segmentation_id)
                 #TODO bp/ovs-tunnel-partial-mesh
                 #Ask plugin what tunnel endpoint is bound to this GRE overlay ID
-                self.plugin_rpc.tunnel_add_segment_endpoint(self.context,
+                entry = self.plugin_rpc.tunnel_add_segment_endpoint(self.context,
 							    net_uuid, 
 							    self.local_ip)
+                endpoints = entry['endpoints']
+                for i in endpoints:
+                    LOG.debug(_("endpoints for segmentation id %(segmentation_id) : %(i) ")
                 
                 # inbound bcast/mcast
                 self.tun_br.add_flow(
