@@ -312,19 +312,32 @@ class OVSQuantumAgent(sg_rpc.SecurityGroupAgentRpcCallbackMixin):
         if network_type == constants.TYPE_GRE:
             if self.enable_tunneling:
                 # outbound
-                self.tun_br.add_flow(priority=4, in_port=self.patch_int_ofport,
-                                     dl_vlan=lvid,
-                                     actions="set_tunnel:%s,normal" %
-                                     segmentation_id)
+#                self.tun_br.add_flow(priority=4, in_port=self.patch_int_ofport,
+#                                     dl_vlan=lvid,
+#                                     actions="set_tunnel:%s,normal" %
+#                                     segmentation_id)
                 #TODO bp/ovs-tunnel-partial-mesh
                 #Ask plugin what tunnel endpoint is bound to this GRE overlay ID
                 entry = self.plugin_rpc.tunnel_add_segment_endpoint(self.context,
 							    net_uuid, 
 							    self.local_ip)
                 endpoints = entry['endpoints']
-                for i in endpoints:
-                    LOG.debug(_("endpoints for segmentation id %(segmentation_id) : %(i) "))
-                
+		tun_br_ports = self.tun_br.get_port_name_list()
+		endpoints_ofports = []
+                for i in endpoints :
+                    LOG.debug(_("endpoints for segmentation id %(segmentation_id)s: %(i)s "), 
+				{'segmentation_id': segmentation_id, 'i': i})
+               	    port_name = "gre-%s" % i
+		    if port_name in tun_br_port :
+			 endpoints_ofports.append(self.tun_br.get_port_ofport(port_name))
+		if endpoints_ofports :
+		    actions_ofport = ",".join(endpoints_ofports)
+                    # outbound
+                    self.tun_br.add_flow(priority=4, in_port=self.patch_int_ofport,
+                                         dl_vlan=lvid,
+                                         actions="set_tunnel:%s,%s" %
+                                         (segmentation_id,actions_ofport))
+
                 # inbound bcast/mcast
                 self.tun_br.add_flow(
                     priority=3,
