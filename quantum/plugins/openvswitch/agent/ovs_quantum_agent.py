@@ -322,16 +322,17 @@ class OVSQuantumAgent(sg_rpc.SecurityGroupAgentRpcCallbackMixin):
 							    net_uuid, 
 							    self.local_ip)
                 endpoints = entry['endpoints']
-		tun_br_ports = self.tun_br.get_port_name_list()
-		endpoints_ofports = []
+                tun_br_ports = self.tun_br.get_port_name_list()
+                endpoints_ofports = []
                 for i in endpoints :
                     LOG.debug(_("endpoints for segmentation id %(segmentation_id)s: %(i)s "), 
-				{'segmentation_id': segmentation_id, 'i': i})
-               	    port_name = "gre-%s" % i
-		    if port_name in tun_br_ports :
-			 endpoints_ofports.append(self.tun_br.get_port_ofport(port_name))
-		if endpoints_ofports :
-		    actions_ofport = ",".join(endpoints_ofports)
+				                {'segmentation_id': segmentation_id, 'i': i})
+                    port_name = "gre-%s" % i
+                    if port_name in tun_br_ports :
+                        endpoints_ofports.append(self.tun_br.get_port_ofport(port_name))
+
+                if endpoints_ofports :
+                    actions_ofport = ",".join(endpoints_ofports)
                     # outbound
                     self.tun_br.add_flow(priority=4, in_port=self.patch_int_ofport,
                                          dl_vlan=lvid,
