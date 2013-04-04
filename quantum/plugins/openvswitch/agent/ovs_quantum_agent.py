@@ -328,7 +328,7 @@ class OVSQuantumAgent(sg_rpc.SecurityGroupAgentRpcCallbackMixin):
                     LOG.debug(_("endpoints for segmentation id %(segmentation_id)s: %(i)s "), 
 				{'segmentation_id': segmentation_id, 'i': i})
                	    port_name = "gre-%s" % i
-		    if port_name in tun_br_port :
+		    if port_name in tun_br_ports :
 			 endpoints_ofports.append(self.tun_br.get_port_ofport(port_name))
 		if endpoints_ofports :
 		    actions_ofport = ",".join(endpoints_ofports)
