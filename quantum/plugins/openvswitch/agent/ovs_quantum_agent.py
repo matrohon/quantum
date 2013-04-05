@@ -170,7 +170,8 @@ class OVSQuantumAgent(sg_rpc.SecurityGroupAgentRpcCallbackMixin):
         self.int_br = self.setup_integration_br(integ_br)
         self.setup_physical_bridges(bridge_mappings)
         self.local_vlan_map = {}
-
+        self.tun_br_netport_map = {}
+        
         self.polling_interval = polling_interval
 
         self.enable_tunneling = enable_tunneling
@@ -279,7 +280,29 @@ class OVSQuantumAgent(sg_rpc.SecurityGroupAgentRpcCallbackMixin):
             return
         tun_name = 'gre-%s' % tunnel_id
         self.tun_br.add_tunnel_port(tun_name, tunnel_ip)
-
+        
+    def endpoint_update(self, context, **kwargs):
+        LOG.debug(_("endpoint_update received"))
+        if not self.enable_tunneling:
+            return
+        endpoint = kwargs.get('endpoint')
+        net_id = kwargs.get('net_id')
+        if net_id not in self.local_vlan_map:
+            return
+        endpoint_ofport = self.tun_br.get_port_ofport("gre-%s" % endpoint)
+        #if the flow exists modify the flow in br-tun to add this port
+        if self.tun_br_netport_map[net_id] :
+            self.tun_br_netport_map[net_id].append(endpoint_ofport)
+            #TODO modify flow
+        else : 
+            self.tun_br_netport_map[net_id] = [endpoint_ofport]
+            lvid = self.local_vlan_map[net_id].vlan
+            segmentation_id = self.local_vlan_map[net_id].segmentation_id
+            self.tun_br.add_flow(priority=4, in_port=self.patch_int_ofport,
+                                         dl_vlan=lvid,
+                                         actions="set_tunnel:%s,%s" %
+                                         (segmentation_id,endpoint_ofport))
+            
     def create_rpc_dispatcher(self):
         '''Get the rpc dispatcher for this manager.
 
@@ -330,15 +353,17 @@ class OVSQuantumAgent(sg_rpc.SecurityGroupAgentRpcCallbackMixin):
                     port_name = "gre-%s" % i
                     if port_name in tun_br_ports :
                         endpoints_ofports.append(self.tun_br.get_port_ofport(port_name))
+                       
 
                 if endpoints_ofports :
+                    self.tun_br_netport_map[net_uuid] = endpoints_ofports
                     actions_ofport = ",".join(endpoints_ofports)
                     # outbound
                     self.tun_br.add_flow(priority=4, in_port=self.patch_int_ofport,
                                          dl_vlan=lvid,
                                          actions="set_tunnel:%s,%s" %
                                          (segmentation_id,actions_ofport))
-
+                    
                 # inbound bcast/mcast
                 self.tun_br.add_flow(
                     priority=3,

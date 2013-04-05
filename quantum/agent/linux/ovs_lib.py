@@ -151,6 +151,16 @@ class OVSBridge:
         flow_str = ",".join(flow_expr_arr)
         self.run_ofctl("add-flow", [flow_str])
 
+    def mod_flow(self, **kwargs):
+        if "actions" not in kwargs:
+            raise Exception(_("Must specify one or more actions"))
+        
+        flow_expr_arr = self._build_flow_expr_arr(**kwargs)
+        flow_expr_arr.append("actions=%s" % (kwargs["actions"]))
+        flow_str = ",".join(flow_expr_arr)
+        LOG.debug(_("modifying flow that matches : %s"),flow_str)
+        self.run_ofctl("mod-flow", [flow_str])
+
     def delete_flows(self, **kwargs):
         kwargs['delete'] = True
         flow_expr_arr = self._build_flow_expr_arr(**kwargs)

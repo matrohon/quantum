@@ -357,6 +357,14 @@ def get_tunnel_endpoints():
     return [{'id': tunnel.id,
              'ip_address': tunnel.ip_address} for tunnel in tunnels]
 
+def get_tunnel_endpoint(ip_addr):
+    session = db.get_session()
+    try:
+        endpoint = (session.query(ovs_models_v2.TunnelEndpoint.id).
+        filter_by(ip_address=ip_addr).one())
+    except exc.NoResultFound:
+        return 0
+    return endpoint
 
 def _generate_tunnel_id(session):
     try:
