@@ -404,6 +404,7 @@ def get_segment_endpoints(net_id):
         endpoints = session.query(ovs_models_v2.TunnelEndpoint.id).join(ovs_models_v2.TunnelBinding).filter_by(network_id=net_id).all()
     except exc.NoResultFound:
         return []
+    LOG.debug(_("entering get_segment_endpoints for net_id : %s"), net_id)
     for endpoint in endpoints :
         LOG.debug(_("tunnel endpoint=%s"), endpoint.id)
     return [endpoint.id for endpoint in endpoints]
