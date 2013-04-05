@@ -291,7 +291,7 @@ class OVSQuantumAgent(sg_rpc.SecurityGroupAgentRpcCallbackMixin):
             return
         endpoint_ofport = self.tun_br.get_port_ofport("gre-%s" % endpoint)
         #if the flow exists modify the flow in br-tun to add this port
-        if self.tun_br_netport_map[net_id] :
+        if net_id in self.tun_br_netport_map :
             LOG.debug(_("net_id %s already in tun_br_netport_map"), net_id)
             self.tun_br_netport_map[net_id].append(endpoint_ofport)
             #TODO modify flow
