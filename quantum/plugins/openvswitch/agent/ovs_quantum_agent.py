@@ -285,16 +285,18 @@ class OVSQuantumAgent(sg_rpc.SecurityGroupAgentRpcCallbackMixin):
         LOG.debug(_("endpoint_update received"))
         if not self.enable_tunneling:
             return
-        endpoint = kwargs.get('endpoint')
+        endpoint = kwargs.get('endpoint')[0]
         net_id = kwargs.get('net_id')
         if net_id not in self.local_vlan_map:
             return
         endpoint_ofport = self.tun_br.get_port_ofport("gre-%s" % endpoint)
         #if the flow exists modify the flow in br-tun to add this port
         if self.tun_br_netport_map[net_id] :
+            LOG.debug(_("net_id %s already in tun_br_netport_map"), net_id)
             self.tun_br_netport_map[net_id].append(endpoint_ofport)
             #TODO modify flow
         else : 
+            LOG.debug(_("net_id %s doesn't exist; creating flow"), net_id)
             self.tun_br_netport_map[net_id] = [endpoint_ofport]
             lvid = self.local_vlan_map[net_id].vlan
             segmentation_id = self.local_vlan_map[net_id].segmentation_id
