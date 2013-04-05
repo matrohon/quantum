@@ -164,7 +164,8 @@ class OVSRpcCallbacks(dhcp_rpc_base.DhcpRpcCallbackMixin,
     def tunnel_add_segment_endpoint(self, rpc_context, **kwargs):
         net_id = kwargs.get('net_id')
         tunnel_ip = kwargs.get('tunnel_ip')
-        LOG.debug(_("tunnel_add_segment_endpoint : net_id : %s; tunnel_ip : %s"), net_id, tunnel_ip)
+        LOG.debug(_("tunnel_add_segment_endpoint : net_id : %s;" 
+                    "tunnel_ip : %s"), net_id, tunnel_ip)
         
         ovs_db_v2.add_tunnel_binding(net_id, tunnel_ip)
         LOG.debug(_("tunnel binding added to DB"))
@@ -179,6 +180,10 @@ class OVSRpcCallbacks(dhcp_rpc_base.DhcpRpcCallbackMixin,
         endpoints = ovs_db_v2.get_segment_endpoints(net_id)
         entry = dict()
         entry['endpoints'] = endpoints
+        
+        calling_endpoint = ovs_db_v2.get_tunnel_endpoint(tunnel_ip)
+        self.notifier.endpoint_update(rpc_context, 
+                                      calling_endpoint, net_id)
         
         return entry
         
@@ -228,7 +233,14 @@ class AgentNotifierApi(proxy.RpcProxy,
                                        tunnel_ip=tunnel_ip,
                                        tunnel_id=tunnel_id),
                          topic=self.topic_tunnel_update)
-
+        
+    def endpoint_update(self, context, endpoint, net_id):
+        self.fanout_cast(context,
+                         self.make_msg('endpoint_update',
+                                       endpoint=endpoint,
+                                       net_id=net_id),
+                         topic=self.topic_tunnel_update)
+                         
 
 class OVSQuantumPluginV2(db_base_plugin_v2.QuantumDbPluginV2,
                          extraroute_db.ExtraRoute_db_mixin,
