@@ -289,7 +289,13 @@ class OVSQuantumAgent(sg_rpc.SecurityGroupAgentRpcCallbackMixin):
         net_id = kwargs.get('net_id')
         if net_id not in self.local_vlan_map:
             return
-        endpoint_ofport = self.tun_br.get_port_ofport("gre-%s" % endpoint)
+        
+        try : 
+            endpoint_ofport = self.tun_br.get_port_ofport("gre-%s" % endpoint)
+        except Exception, e:
+            LOG.debug(_("endpoint update from unknown GRE endpoint %s :"
+                        " this must be me!"), endpoint)
+            exit
         #if the flow exists modify the flow in br-tun to add this port
         if net_id in self.tun_br_netport_map :
             LOG.debug(_("net_id %s already in tun_br_netport_map"), net_id)
