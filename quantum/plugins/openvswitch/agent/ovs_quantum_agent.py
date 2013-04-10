@@ -294,6 +294,12 @@ class OVSQuantumAgent(sg_rpc.SecurityGroupAgentRpcCallbackMixin):
         self.tun_br_netport_map[net_id].append(endpoint_ofport)
         lvid = self.local_vlan_map[net_id].vlan
         segmentation_id = self.local_vlan_map[net_id].segmentation_id
+
+        if endpoint_ofport is None : 
+            LOG.debug(_("endpoint update from unknown GRE endpoint %s :"
+    			" this must be me!"), endpoint)
+            return
+
         if net_id in self.tun_br_netport_map :
             actions_ofport = ",".join(self.tun_br_netport_map[net_id])
             LOG.debug(_("updating the output flow for network id %s "
