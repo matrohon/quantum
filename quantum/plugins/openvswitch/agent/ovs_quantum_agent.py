@@ -290,22 +290,22 @@ class OVSQuantumAgent(sg_rpc.SecurityGroupAgentRpcCallbackMixin):
         if net_id not in self.local_vlan_map:
             return
         
-        try : 
-            endpoint_ofport = self.tun_br.get_port_ofport("gre-%s" % endpoint)
-        except Exception, e:
-            LOG.debug(_("endpoint update from unknown GRE endpoint %s :"
-                        " this must be me!"), endpoint)
-            exit
-        #if the flow exists modify the flow in br-tun to add this port
+        endpoint_ofport = self.tun_br.get_port_ofport("gre-%s" % endpoint)
+        self.tun_br_netport_map[net_id].append(endpoint_ofport)
+        lvid = self.local_vlan_map[net_id].vlan
+        segmentation_id = self.local_vlan_map[net_id].segmentation_id
         if net_id in self.tun_br_netport_map :
-            LOG.debug(_("net_id %s already in tun_br_netport_map"), net_id)
-            self.tun_br_netport_map[net_id].append(endpoint_ofport)
-            #TODO modify flow
+            actions_ofport = ",".join(self.tun_br_netport_map[net_id])
+            LOG.debug(_("updating the output flow for network id %s "
+                        "with segmentation id %s; new tunnel endpoint is %s"),
+                       net_id, segmentation_id, endpoint)
+            self.tun_br.mod_flow(in_port=self.patch_int_ofport, dl_vlan=lvid,
+                                 actions="set_tunnel:%s,%s" %
+                                 (segmentation_id,actions_ofport))
         else : 
-            LOG.debug(_("net_id %s doesn't exist; creating flow"), net_id)
-            self.tun_br_netport_map[net_id] = [endpoint_ofport]
-            lvid = self.local_vlan_map[net_id].vlan
-            segmentation_id = self.local_vlan_map[net_id].segmentation_id
+            LOG.debug(_("updating the output flow for network id %s "
+                        "with segmentation id %s; new tunnel endpoint is %s"), 
+                      net_id, segmentation_id, endpoint)
             self.tun_br.add_flow(priority=4, in_port=self.patch_int_ofport,
                                          dl_vlan=lvid,
                                          actions="set_tunnel:%s,%s" %

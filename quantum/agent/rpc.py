@@ -97,8 +97,7 @@ class PluginApi(proxy.RpcProxy):
         return self.call(context,
                          self.make_msg('tunnel_sync', tunnel_ip=tunnel_ip),
                          topic=self.topic)
-    #TODO : bp/ovs-tunnel-partial-mesh
-    # ADD API to populate endpoint to network relationship
+    
     def tunnel_add_segment_endpoint(self, context, net_id, tunnel_ip):                                    
         return self.call(context, 
                          self.make_msg('tunnel_add_segment_endpoint', 
