@@ -309,7 +309,7 @@ class OVSQuantumAgent(sg_rpc.SecurityGroupAgentRpcCallbackMixin):
                                  actions="set_tunnel:%s,%s" %
                                  (segmentation_id,actions_ofport))
         else : 
-            LOG.debug(_("updating the output flow for network id %s "
+            LOG.debug(_("creating the output flow for network id %s "
                         "with segmentation id %s; new tunnel endpoint is %s"), 
                       net_id, segmentation_id, endpoint)
             self.tun_br_netport_map[net_id]=[endpoint_ofport]

@@ -111,14 +111,16 @@ class OVSBridge:
     def _build_flow_expr_arr(self, **kwargs):
         flow_expr_arr = []
         is_delete_expr = kwargs.get('delete', False)
-        if not is_delete_expr:
-            prefix = ("hard_timeout=%s,idle_timeout=%s,priority=%s" %
-                     (kwargs.get('hard_timeout', '0'),
-                      kwargs.get('idle_timeout', '0'),
-                      kwargs.get('priority', '1')))
-            flow_expr_arr.append(prefix)
-        elif 'priority' in kwargs:
-            raise Exception(_("Cannot match priority on flow deletion"))
+        is_modflow_expr = kwargs.get('mod-flow', False)
+        if not is_modflow_expr:
+            if not is_delete_expr:
+                prefix = ("hard_timeout=%s,idle_timeout=%s,priority=%s" %
+                         (kwargs.get('hard_timeout', '0'),
+                          kwargs.get('idle_timeout', '0'),
+                          kwargs.get('priority', '1')))
+                flow_expr_arr.append(prefix)
+            elif 'priority' in kwargs:
+                raise Exception(_("Cannot match priority on flow deletion"))
 
         in_port = ('in_port' in kwargs and ",in_port=%s" %
                    kwargs['in_port'] or '')
