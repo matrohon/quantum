@@ -291,7 +291,6 @@ class OVSQuantumAgent(sg_rpc.SecurityGroupAgentRpcCallbackMixin):
             return
         
         endpoint_ofport = self.tun_br.get_port_ofport("gre-%s" % endpoint)
-        self.tun_br_netport_map[net_id].append(endpoint_ofport)
         lvid = self.local_vlan_map[net_id].vlan
         segmentation_id = self.local_vlan_map[net_id].segmentation_id
 
@@ -301,6 +300,7 @@ class OVSQuantumAgent(sg_rpc.SecurityGroupAgentRpcCallbackMixin):
             return
 
         if net_id in self.tun_br_netport_map :
+            self.tun_br_netport_map[net_id].append(endpoint_ofport)
             actions_ofport = ",".join(self.tun_br_netport_map[net_id])
             LOG.debug(_("updating the output flow for network id %s "
                         "with segmentation id %s; new tunnel endpoint is %s"),
@@ -312,6 +312,7 @@ class OVSQuantumAgent(sg_rpc.SecurityGroupAgentRpcCallbackMixin):
             LOG.debug(_("updating the output flow for network id %s "
                         "with segmentation id %s; new tunnel endpoint is %s"), 
                       net_id, segmentation_id, endpoint)
+            self.tun_br_netport_map[net_id]=[endpoint_ofport]
             self.tun_br.add_flow(priority=4, in_port=self.patch_int_ofport,
                                          dl_vlan=lvid,
                                          actions="set_tunnel:%s,%s" %
