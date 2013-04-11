@@ -154,6 +154,7 @@ class OVSBridge:
         self.run_ofctl("add-flow", [flow_str])
 
     def mod_flow(self, **kwargs):
+        kwargs['mod-flow'] = True
         if "actions" not in kwargs:
             raise Exception(_("Must specify one or more actions"))
         
