@@ -453,7 +453,7 @@ class OVSQuantumAgent(sg_rpc.SecurityGroupAgentRpcCallbackMixin):
             if self.enable_tunneling:
                 self.tun_br.delete_flows(tun_id=lvm.segmentation_id)
                 self.tun_br.delete_flows(dl_vlan=lvm.vlan)
-                self.plugin_rpc.tunnel_del_segment_endpoint(self.context,
+                self.plugin_rpc.tunnel_del_net_from_endpoint(self.context,
                                 net_uuid, 
                                 self.local_ip)
         elif lvm.network_type == constants.TYPE_FLAT:
