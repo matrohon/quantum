@@ -246,6 +246,13 @@ class AgentNotifierApi(proxy.RpcProxy,
                                        endpoint=endpoint,
                                        net_id=net_id),
                          topic=self.topic_tunnel_update)
+        
+    def endpoint_del_net(self, context, endpoint, net_id):
+        self.fanout_cast(context,
+                         self.make_msg('endpoint_del_net',
+                                       endpoint=endpoint,
+                                       net_id=net_id),
+                         topic=self.topic_tunnel_update)
                          
 
 class OVSQuantumPluginV2(db_base_plugin_v2.QuantumDbPluginV2,
