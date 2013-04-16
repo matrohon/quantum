@@ -281,12 +281,13 @@ class OVSQuantumAgent(sg_rpc.SecurityGroupAgentRpcCallbackMixin):
         tun_name = 'gre-%s' % tunnel_id
         self.tun_br.add_tunnel_port(tun_name, tunnel_ip)
         
-    def endpoint_update(self, context, **kwargs):
-        LOG.debug(_("endpoint_update received"))
+    def endpoint_add_net(self, context, **kwargs):
+        LOG.debug(_("endpoint_add_net received"))
         if not self.enable_tunneling:
             return
-        endpoint = kwargs.get('endpoint')[0]
+        endpoint = kwargs.get('endpoint')
         net_id = kwargs.get('net_id')
+        LOG.debug(_("endpoint_add_net with net_id %s and endpoint %s"), net_id, endpoint)
         if net_id not in self.local_vlan_map:
             return
         
@@ -295,7 +296,7 @@ class OVSQuantumAgent(sg_rpc.SecurityGroupAgentRpcCallbackMixin):
         segmentation_id = self.local_vlan_map[net_id].segmentation_id
 
         if endpoint_ofport is None : 
-            LOG.debug(_("endpoint update from unknown GRE endpoint %s :"
+            LOG.debug(_("endpoint_add_net from unknown GRE endpoint %s :"
     			" this must be me!"), endpoint)
             return
 
@@ -317,6 +318,15 @@ class OVSQuantumAgent(sg_rpc.SecurityGroupAgentRpcCallbackMixin):
                                          dl_vlan=lvid,
                                          actions="set_tunnel:%s,%s" %
                                          (segmentation_id,endpoint_ofport))
+            
+    def endpoint_del_net(self, context, **kwargs):
+        LOG.debug(_("endpoint_del_net received"))
+        if not self.enable_tunneling:
+            return
+        endpoint = kwargs.get('endpoint')
+        net_id = kwargs.get('net_id')
+        LOG.debug(_("endpoint_add_net with net_id %s and endpoint %s"), net_id, endpoint)
+        
             
     def create_rpc_dispatcher(self):
         '''Get the rpc dispatcher for this manager.
@@ -350,21 +360,15 @@ class OVSQuantumAgent(sg_rpc.SecurityGroupAgentRpcCallbackMixin):
         if network_type == constants.TYPE_GRE:
             if self.enable_tunneling:
                 # outbound
-#                self.tun_br.add_flow(priority=4, in_port=self.patch_int_ofport,
-#                                     dl_vlan=lvid,
-#                                     actions="set_tunnel:%s,normal" %
-#                                     segmentation_id)
-                #TODO bp/ovs-tunnel-partial-mesh
-                #Ask plugin what tunnel endpoint is bound to this GRE overlay ID
-                entry = self.plugin_rpc.tunnel_add_segment_endpoint(self.context,
+                entry = self.plugin_rpc.tunnel_add_net_to_endpoint(self.context,
 							    net_uuid, 
 							    self.local_ip)
                 endpoints = entry['endpoints']
                 tun_br_ports = self.tun_br.get_port_name_list()
                 endpoints_ofports = []
                 for i in endpoints :
-                    LOG.debug(_("endpoints for segmentation id %(segmentation_id)s: %(i)s "), 
-				                {'segmentation_id': segmentation_id, 'i': i})
+                    LOG.debug(_("endpoints for net-uuid %s with segmentation id %s : %s "), 
+				                (net_uuid, segmentation_id, i))
                     port_name = "gre-%s" % i
                     if port_name in tun_br_ports :
                         endpoints_ofports.append(self.tun_br.get_port_ofport(port_name))
@@ -449,6 +453,9 @@ class OVSQuantumAgent(sg_rpc.SecurityGroupAgentRpcCallbackMixin):
             if self.enable_tunneling:
                 self.tun_br.delete_flows(tun_id=lvm.segmentation_id)
                 self.tun_br.delete_flows(dl_vlan=lvm.vlan)
+                self.plugin_rpc.tunnel_del_segment_endpoint(self.context,
+                                net_uuid, 
+                                self.local_ip)
         elif lvm.network_type == constants.TYPE_FLAT:
             if lvm.physical_network in self.phys_brs:
                 # outbound

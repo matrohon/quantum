@@ -98,7 +98,13 @@ class PluginApi(proxy.RpcProxy):
                          self.make_msg('tunnel_sync', tunnel_ip=tunnel_ip),
                          topic=self.topic)
     
-    def tunnel_add_segment_endpoint(self, context, net_id, tunnel_ip):                                    
+    def tunnel_add_net_to_endpoint(self, context, net_id, tunnel_ip):                                    
+        return self.call(context, 
+                         self.make_msg('tunnel_add_segment_endpoint', 
+                         net_id=net_id, tunnel_ip=tunnel_ip),
+                         topic=self.topic)
+        
+    def tunnel_del_net_from_endpoint(self, context, net_id, tunnel_ip):                                    
         return self.call(context, 
                          self.make_msg('tunnel_add_segment_endpoint', 
                          net_id=net_id, tunnel_ip=tunnel_ip),
