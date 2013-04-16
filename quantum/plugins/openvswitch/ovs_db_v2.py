@@ -403,12 +403,14 @@ def del_tunnel_binding(net_id, tun_ip):
     session = db.get_session()
     try:
         entry = (session.query(ovs_models_v2.TunnelBinding).
-                 filter_by(network_id=net_id, ip_address=tun_ip).one())
+                 filter_by(network_id=net_id, ip_address=tun_ip).
+                 with_lockmode('update').one())
+        session.delete(entry)
+        session.flush()
     except exc.NoResultFound:
-        LOG.debug(_("no binding in DB for endpoint_IP %s and net_id %s"), 
+        LOG.warning(_("no binding in DB for endpoint_IP %s and net_id %s"), 
                   tun_ip, net_id)
-        return
-    session.delete(entry)
+        
 
 def get_net_endpoints(net_id):
     #get endpoint ip for this tunnel from ovs_tunnel_bindings

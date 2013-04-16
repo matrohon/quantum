@@ -325,7 +325,7 @@ class OVSQuantumAgent(sg_rpc.SecurityGroupAgentRpcCallbackMixin):
             return
         endpoint = kwargs.get('endpoint')
         net_id = kwargs.get('net_id')
-        LOG.debug(_("endpoint_add_net with net_id %s and endpoint %s"), net_id, endpoint)
+        LOG.debug(_("endpoint_del_net with net_id %s and endpoint %s"), net_id, endpoint)
         
             
     def create_rpc_dispatcher(self):
