@@ -167,19 +167,16 @@ class OVSRpcCallbacks(dhcp_rpc_base.DhcpRpcCallbackMixin,
         LOG.debug(_("tunnel_add_net_to_endpoint : net_id : %s; " 
                     "tunnel_ip : %s"), net_id, tunnel_ip)
         
+        endpoints = ovs_db_v2.get_net_endpoints(net_id)
+        
         ovs_db_v2.add_tunnel_binding(net_id, tunnel_ip)
         LOG.debug(_("tunnel binding added to DB"))
-
-        
-        endpoints = ovs_db_v2.get_net_endpoints(net_id)
-        entry = dict()
-        entry['endpoints'] = endpoints
         
         calling_endpoint = ovs_db_v2.get_tunnel_endpoint(tunnel_ip)
         self.notifier.endpoint_add_net(rpc_context, 
                                       calling_endpoint, net_id)
         
-        return entry
+        return endpoints
     
     def tunnel_del_net_from_endpoint(self, rpc_context, **kwargs):
         net_id = kwargs.get('net_id')
