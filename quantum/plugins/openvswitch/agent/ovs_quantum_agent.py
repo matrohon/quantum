@@ -325,8 +325,26 @@ class OVSQuantumAgent(sg_rpc.SecurityGroupAgentRpcCallbackMixin):
             return
         endpoint = kwargs.get('endpoint')
         net_id = kwargs.get('net_id')
-        LOG.debug(_("endpoint_del_net with net_id %s and endpoint %s"), net_id, endpoint)
+        LOG.debug(_("endpoint_del_net with net_id %s and endpoint %s"), 
+                  net_id, endpoint)
+        if net_id not in self.local_vlan_map:
+            return
         
+        endpoint_ofport = self.tun_br.get_port_ofport("gre-%s" % endpoint)
+        self.tun_br_netport_map[net_id].remove(endpoint_ofport)
+        lvid = self.local_vlan_map[net_id].vlan
+        if not self.tun_br_netport_map[net_id]:
+            LOG.debug(_("deleting the output flow for network id %s"), net_id)
+            self.tun_br.delete_flows(in_port=self.patch_int_ofport, dl_vlan=lvid)
+        else:
+            segmentation_id = self.local_vlan_map[net_id].segmentation_id
+            actions_ofport = ",".join(self.tun_br_netport_map[net_id])
+            LOG.debug(_("updating the output flow for network id %s "
+                        "with segmentation id %s; remove tunnel endpoint %s"),
+                       net_id, segmentation_id, endpoint)
+            self.tun_br.mod_flow(in_port=self.patch_int_ofport, dl_vlan=lvid,
+                                 actions="set_tunnel:%s,%s" %
+                                 (segmentation_id,actions_ofport))
             
     def create_rpc_dispatcher(self):
         '''Get the rpc dispatcher for this manager.
@@ -456,6 +474,7 @@ class OVSQuantumAgent(sg_rpc.SecurityGroupAgentRpcCallbackMixin):
                 self.plugin_rpc.tunnel_del_net_from_endpoint(self.context,
                                 net_uuid, 
                                 self.local_ip)
+                del self.tun_br_netport_map[net_uuid]
         elif lvm.network_type == constants.TYPE_FLAT:
             if lvm.physical_network in self.phys_brs:
                 # outbound
