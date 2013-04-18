@@ -19,9 +19,11 @@
 import mox
 from oslo.config import cfg
 
+from quantum import context
 from quantum.agent.linux import ip_lib
 from quantum.agent.linux import ovs_lib
 from quantum.agent.linux import utils
+from quantum.agent import rpc
 from quantum.openstack.common import log
 from quantum.plugins.openvswitch.agent import ovs_quantum_agent
 from quantum.plugins.openvswitch.common import constants
@@ -75,6 +77,9 @@ class TunnelTest(base.BaseTestCase):
         self.INT_OFPORT = 11111
         self.TUN_OFPORT = 22222
         self.MAP_TUN_OFPORT = 33333
+        self.TUN_ENDPOINT = '2'
+        self.TUN_ENDPOINT_IF_NAME = 'gre-%s' % self.TUN_ENDPOINT
+        self.TUN_ENDPOINT_OFPORT = '2'
         self.inta = self.mox.CreateMock(ip_lib.IPDevice)
         self.intb = self.mox.CreateMock(ip_lib.IPDevice)
         self.inta.link = self.mox.CreateMock(ip_lib.IpLinkCommand)
@@ -135,13 +140,22 @@ class TunnelTest(base.BaseTestCase):
         self.mox.VerifyAll()
 
     def testProvisionLocalVlan(self):
-        action_string = 'set_tunnel:%s,normal' % LS_ID
+        self.mock_tun_bridge.get_port_name_list().AndReturn(
+                    [self.TUN_ENDPOINT_IF_NAME])
+        self.mock_tun_bridge.get_port_ofport(
+        self.TUN_ENDPOINT_IF_NAME).AndReturn(self.TUN_ENDPOINT_OFPORT)
+
+        action_string = 'set_tunnel:%s,%s' % (LS_ID,self.TUN_ENDPOINT_OFPORT)
         self.mock_tun_bridge.add_flow(priority=4, in_port=self.INT_OFPORT,
                                       dl_vlan=LV_ID, actions=action_string)
 
         action_string = 'mod_vlan_vid:%s,output:%s' % (LV_ID, self.INT_OFPORT)
         self.mock_tun_bridge.add_flow(priority=3, tun_id=LS_ID,
                                       dl_dst=BCAST_MAC, actions=action_string)
+
+        self.mox.StubOutWithMock(rpc.PluginApi, 'tunnel_add_net_to_endpoint')
+        rpc.PluginApi.tunnel_add_net_to_endpoint(mox.IsA(context.ContextBase),
+            NET_UUID,'10.0.0.1').AndReturn([self.TUN_ENDPOINT])
 
         self.mox.ReplayAll()
 
@@ -228,6 +242,7 @@ class TunnelTest(base.BaseTestCase):
                                               'sudo', 2, True)
         a.available_local_vlans = set()
         a.local_vlan_map[NET_UUID] = LVM
+        a.tun_br_netport_map[NET_UUID] = [self.TUN_ENDPOINT_OFPORT]
         a.reclaim_local_vlan(NET_UUID, LVM)
         self.assertTrue(LVM.vlan in a.available_local_vlans)
         self.mox.VerifyAll()
@@ -344,6 +359,48 @@ class TunnelTest(base.BaseTestCase):
         a.tunnel_update(
             mox.MockAnything, tunnel_id='1', tunnel_ip='10.0.0.1')
         self.mox.VerifyAll()
+    
+    def testEndpointAddUnknownNet(self):
+        self.mock_tun_bridge.get_port_ofport(
+            self.TUN_ENDPOINT_IF_NAME).AndReturn(self.TUN_ENDPOINT_OFPORT)
+
+        action_string = 'set_tunnel:%s,%s' % (LS_ID,self.TUN_ENDPOINT_OFPORT)
+        self.mock_tun_bridge.add_flow(priority=4, in_port=self.INT_OFPORT,
+                                      dl_vlan=LV_ID, actions=action_string)
+
+        self.mox.ReplayAll()
+        a = ovs_quantum_agent.OVSQuantumAgent(self.INT_BRIDGE,
+                                              self.TUN_BRIDGE,
+                                              '10.0.0.1', self.NET_MAPPING,
+                                              'sudo', 2, True)
+        a.local_vlan_map[NET_UUID] = LVM
+        a.endpoint_add_net(mox.MockAnything, net_id=NET_UUID,
+            endpoint=self.TUN_ENDPOINT)
+
+        self.mox.VerifyAll()
+
+    def testEndpointAddKnownNet(self):
+        self.mock_tun_bridge.get_port_ofport(
+            self.TUN_ENDPOINT_IF_NAME).AndReturn(self.TUN_ENDPOINT_OFPORT)
+        net_to_port = ['3']
+        action_port=net_to_port.append(self.TUN_ENDPOINT_OFPORT)
+        action_port_str = ','.join(net_to_port)
+        action_string = 'set_tunnel:%s,%s' % (LS_ID,action_port_str)
+        self.mock_tun_bridge.mod_flow(in_port=self.INT_OFPORT,
+                                      dl_vlan=LV_ID, actions=action_string)
+
+        self.mox.ReplayAll()
+        a = ovs_quantum_agent.OVSQuantumAgent(self.INT_BRIDGE,
+                                              self.TUN_BRIDGE,
+                                              '10.0.0.1', self.NET_MAPPING,
+                                              'sudo', 2, True)
+        a.local_vlan_map[NET_UUID] = LVM
+        a.tun_br_netport_map[NET_UUID] = ['3']
+        a.endpoint_add_net(mox.MockAnything, net_id=NET_UUID,
+            endpoint=self.TUN_ENDPOINT)
+
+        self.mox.VerifyAll()
+
 
     def testDaemonLoop(self):
         reply2 = {'current': set(['tap0']),
