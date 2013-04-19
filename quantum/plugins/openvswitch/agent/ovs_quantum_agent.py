@@ -336,6 +336,7 @@ class OVSQuantumAgent(sg_rpc.SecurityGroupAgentRpcCallbackMixin):
         lvid = self.local_vlan_map[net_id].vlan
         if not self.tun_br_netport_map[net_id]:
             LOG.debug(_("deleting the output flow for network id %s"), net_id)
+            del self.tun_br_netport_map[net_id]	
             self.tun_br.delete_flows(in_port=self.patch_int_ofport, dl_vlan=lvid)
         else:
             segmentation_id = self.local_vlan_map[net_id].segmentation_id

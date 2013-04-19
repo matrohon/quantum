@@ -401,6 +401,43 @@ class TunnelTest(base.BaseTestCase):
 
         self.mox.VerifyAll()
 
+    def testEndpointDelNet(self):
+        self.mock_tun_bridge.get_port_ofport(
+            self.TUN_ENDPOINT_IF_NAME).AndReturn(self.TUN_ENDPOINT_OFPORT)
+        action_string = 'set_tunnel:%s,3' % LS_ID
+        self.mock_tun_bridge.mod_flow(in_port=self.INT_OFPORT,
+                                      dl_vlan=LV_ID, actions=action_string)
+
+        self.mox.ReplayAll()
+        a = ovs_quantum_agent.OVSQuantumAgent(self.INT_BRIDGE,
+                                              self.TUN_BRIDGE,
+                                              '10.0.0.1', self.NET_MAPPING,
+                                              'sudo', 2, True)
+        a.local_vlan_map[NET_UUID] = LVM
+        a.tun_br_netport_map[NET_UUID] = ['3',self.TUN_ENDPOINT_OFPORT]
+        a.endpoint_del_net(mox.MockAnything, net_id=NET_UUID,
+            endpoint=self.TUN_ENDPOINT)
+
+        self.mox.VerifyAll()
+
+    def testEndpointDelNetLast(self):
+        self.mock_tun_bridge.get_port_ofport(
+            self.TUN_ENDPOINT_IF_NAME).AndReturn(self.TUN_ENDPOINT_OFPORT)
+        self.mock_tun_bridge.delete_flows(in_port=self.INT_OFPORT,
+                                      dl_vlan=LV_ID)
+
+        self.mox.ReplayAll()
+        a = ovs_quantum_agent.OVSQuantumAgent(self.INT_BRIDGE,
+                                              self.TUN_BRIDGE,
+                                              '10.0.0.1', self.NET_MAPPING,
+                                              'sudo', 2, True)
+        a.local_vlan_map[NET_UUID] = LVM
+        a.tun_br_netport_map[NET_UUID] = [self.TUN_ENDPOINT_OFPORT]
+        a.endpoint_del_net(mox.MockAnything, net_id=NET_UUID,
+            endpoint=self.TUN_ENDPOINT)
+
+        self.mox.VerifyAll()
+
 
     def testDaemonLoop(self):
         reply2 = {'current': set(['tap0']),
