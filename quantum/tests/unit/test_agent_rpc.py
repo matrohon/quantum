@@ -32,6 +32,9 @@ class AgentRPCPluginApi(base.BaseTestCase):
             func_obj = getattr(agent, method)
             if method == 'tunnel_sync':
                 actual_val = func_obj(ctxt, 'fake_tunnel_ip')
+            elif (method == 'tunnel_add_net_to_endpoint' or
+                  method == 'tunnel_del_net_from_endpoint'):
+                actual_val = func_obj(ctxt, 'fake_net_id', 'fake_tunnel_ip')
             else:
                 actual_val = func_obj(ctxt, 'fake_device', 'fake_agent_id')
         self.assertEqual(actual_val, expect_val)
@@ -44,7 +47,12 @@ class AgentRPCPluginApi(base.BaseTestCase):
 
     def test_tunnel_sync(self):
         self._test_rpc_call('tunnel_sync')
+    
+    def test_tunnel_add_net_to_endpoint(self):
+        self._test_rpc_call('tunnel_add_net_to_endpoint')
 
+    def test_tunnel_del_net_from_endpoint(self):
+        self._test_rpc_call('tunnel_del_net_from_endpoint')
 
 class AgentPluginReportState(base.BaseTestCase):
     def test_plugin_report_state(self):
