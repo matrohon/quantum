@@ -360,14 +360,16 @@ def get_tunnel_endpoints():
     return [{'id': tunnel.id,
              'ip_address': tunnel.ip_address} for tunnel in tunnels]
 
+
 def get_tunnel_endpoint(ip_addr):
     session = db.get_session()
     try:
         endpoint = (session.query(ovs_models_v2.TunnelEndpoint.id).
-        filter_by(ip_address=ip_addr).one())
+                    filter_by(ip_address=ip_addr).one())
     except exc.NoResultFound:
         return 0
     return endpoint[0]
+
 
 def _generate_tunnel_id(session):
     max_tunnel_id = session.query(
@@ -387,6 +389,7 @@ def add_tunnel_endpoint(ip):
         session.flush()
     return tunnel
 
+
 def add_tunnel_binding(net_id, tun_ip):
     session = db.get_session()
     try:
@@ -397,6 +400,7 @@ def add_tunnel_binding(net_id, tun_ip):
         session.add(binding)
         session.flush()
 
+
 def del_tunnel_binding(net_id, tun_ip):
     session = db.get_session()
     try:
@@ -406,21 +410,19 @@ def del_tunnel_binding(net_id, tun_ip):
         session.delete(entry)
         session.flush()
     except exc.NoResultFound:
-        LOG.warning(_("no binding in DB for endpoint_IP %s and net_id %s"), 
-                  tun_ip, net_id)
-        
+        LOG.warning(_("no binding in DB for endpoint_IP %s and net_id %s"),
+                    tun_ip, net_id)
+
 
 def get_net_endpoints(net_id):
-    #get endpoint ip for this tunnel from ovs_tunnel_bindings
-    #get endpint gre id for every endpoint ip from tunnel_endpoints
-    #return the gre id list
     session = db.get_session()
     try:
-        endpoints = session.query(ovs_models_v2.TunnelEndpoint.id).join(ovs_models_v2.TunnelBinding).filter_by(network_id=net_id).all()
+        endpoints = (session.query(ovs_models_v2.TunnelEndpoint.id).
+                     join(ovs_models_v2.TunnelBinding).
+                     filter_by(network_id=net_id).all())
     except exc.NoResultFound:
         return []
     LOG.debug(_("entering get_net_endpoints for net_id : %s"), net_id)
-    for endpoint in endpoints :
+    for endpoint in endpoints:
         LOG.debug(_("tunnel endpoint=%s"), endpoint.id)
     return [endpoint.id for endpoint in endpoints]
-

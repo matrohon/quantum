@@ -28,10 +28,11 @@ class TunnelBinding(model_base.BASEV2):
 
     network_id = Column(String(36),
                         ForeignKey('networks.id', ondelete="CASCADE"),
-			primary_key=True)
+                        primary_key=True)
     ip_address = Column(String(64),
-			ForeignKey('ovs_tunnel_endpoints.ip_address', ondelete="CASCADE"),
-			primary_key=True)
+                        ForeignKey('ovs_tunnel_endpoints.ip_address',
+                        ondelete="CASCADE"),
+                        primary_key=True)
 
     def __init__(self, network_id, ip_address):
         self.network_id = network_id
@@ -39,7 +40,8 @@ class TunnelBinding(model_base.BASEV2):
 
     def __repr__(self):
         return "<TunnelBinding(%s,%s)>" % (self.network_id,
-                                               self.ip_address)
+                                           self.ip_address)
+
 
 class VlanAllocation(model_base.BASEV2):
     """Represents allocation state of vlan_id on physical network."""
