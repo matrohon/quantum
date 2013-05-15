@@ -47,12 +47,13 @@ class AgentRPCPluginApi(base.BaseTestCase):
 
     def test_tunnel_sync(self):
         self._test_rpc_call('tunnel_sync')
-    
+
     def test_tunnel_add_net_to_endpoint(self):
         self._test_rpc_call('tunnel_add_net_to_endpoint')
 
     def test_tunnel_del_net_from_endpoint(self):
         self._test_rpc_call('tunnel_del_net_from_endpoint')
+
 
 class AgentPluginReportState(base.BaseTestCase):
     def test_plugin_report_state(self):

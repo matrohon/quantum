@@ -88,8 +88,8 @@ class rpcApiTestCase(base.BaseTestCase):
                                                  topics.UPDATE),
                            'tunnel_update', rpc_method='fanout_cast',
                            tunnel_ip='fake_ip', tunnel_id='fake_id')
-    
-    def test_endpoint_add_net(self): 
+
+    def test_endpoint_add_net(self):
         rpcapi = povs.AgentNotifierApi(topics.AGENT)
         self._test_ovs_api(rpcapi,
                            topics.get_topic_name(topics.AGENT,
@@ -97,8 +97,8 @@ class rpcApiTestCase(base.BaseTestCase):
                                                  topics.UPDATE),
                            'endpoint_add_net', rpc_method='fanout_cast',
                            endpoint='fake_endpoint', net_id='fake_id')
-    
-    def test_endpoint_del_net(self): 
+
+    def test_endpoint_del_net(self):
         rpcapi = povs.AgentNotifierApi(topics.AGENT)
         self._test_ovs_api(rpcapi,
                            topics.get_topic_name(topics.AGENT,
@@ -145,4 +145,3 @@ class rpcApiTestCase(base.BaseTestCase):
         self._test_ovs_api(rpcapi, topics.PLUGIN,
                            'tunnel_del_net_from_endpoint', rpc_method='call',
                            net_id='fake_id', tunnel_ip='fake_tunnel_ip')
-

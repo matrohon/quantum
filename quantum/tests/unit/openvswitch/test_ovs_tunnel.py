@@ -142,11 +142,11 @@ class TunnelTest(base.BaseTestCase):
 
     def testProvisionLocalVlan(self):
         self.mock_tun_bridge.get_port_name_list().AndReturn(
-                    [self.TUN_ENDPOINT_IF_NAME])
+            [self.TUN_ENDPOINT_IF_NAME])
         self.mock_tun_bridge.get_port_ofport(
-        self.TUN_ENDPOINT_IF_NAME).AndReturn(self.TUN_ENDPOINT_OFPORT)
+            self.TUN_ENDPOINT_IF_NAME).AndReturn(self.TUN_ENDPOINT_OFPORT)
 
-        action_string = 'set_tunnel:%s,%s' % (LS_ID,self.TUN_ENDPOINT_OFPORT)
+        action_string = 'set_tunnel:%s,%s' % (LS_ID, self.TUN_ENDPOINT_OFPORT)
         self.mock_tun_bridge.add_flow(priority=4, in_port=self.INT_OFPORT,
                                       dl_vlan=LV_ID, actions=action_string)
 
@@ -155,8 +155,9 @@ class TunnelTest(base.BaseTestCase):
                                       dl_dst=BCAST_MAC, actions=action_string)
 
         self.mox.StubOutWithMock(rpc.PluginApi, 'tunnel_add_net_to_endpoint')
-        rpc.PluginApi.tunnel_add_net_to_endpoint(mox.IsA(context.ContextBase),
-            NET_UUID,'10.0.0.1').AndReturn([self.TUN_ENDPOINT])
+        rpc.PluginApi.tunnel_add_net_to_endpoint(
+            mox.IsA(context.ContextBase),
+            NET_UUID, '10.0.0.1').AndReturn([self.TUN_ENDPOINT])
 
         self.mox.ReplayAll()
 
@@ -371,12 +372,12 @@ class TunnelTest(base.BaseTestCase):
         a.tunnel_update(
             mox.MockAnything, tunnel_id='1', tunnel_ip='10.0.0.1')
         self.mox.VerifyAll()
-    
+
     def testEndpointAddUnknownNet(self):
         self.mock_tun_bridge.get_port_ofport(
             self.TUN_ENDPOINT_IF_NAME).AndReturn(self.TUN_ENDPOINT_OFPORT)
 
-        action_string = 'set_tunnel:%s,%s' % (LS_ID,self.TUN_ENDPOINT_OFPORT)
+        action_string = 'set_tunnel:%s,%s' % (LS_ID, self.TUN_ENDPOINT_OFPORT)
         self.mock_tun_bridge.add_flow(priority=4, in_port=self.INT_OFPORT,
                                       dl_vlan=LV_ID, actions=action_string)
 
@@ -386,8 +387,8 @@ class TunnelTest(base.BaseTestCase):
                                               '10.0.0.1', self.NET_MAPPING,
                                               'sudo', 2, True)
         a.local_vlan_map[NET_UUID] = LVM
-        a.endpoint_add_net(mox.MockAnything, net_id=NET_UUID,
-            endpoint=self.TUN_ENDPOINT)
+        a.endpoint_add_net(
+            mox.MockAnything, net_id=NET_UUID, endpoint=self.TUN_ENDPOINT)
 
         self.mox.VerifyAll()
 
@@ -395,9 +396,9 @@ class TunnelTest(base.BaseTestCase):
         self.mock_tun_bridge.get_port_ofport(
             self.TUN_ENDPOINT_IF_NAME).AndReturn(self.TUN_ENDPOINT_OFPORT)
         net_to_port = ['3']
-        action_port=net_to_port.append(self.TUN_ENDPOINT_OFPORT)
+        action_port = net_to_port.append(self.TUN_ENDPOINT_OFPORT)
         action_port_str = ','.join(net_to_port)
-        action_string = 'set_tunnel:%s,%s' % (LS_ID,action_port_str)
+        action_string = 'set_tunnel:%s,%s' % (LS_ID, action_port_str)
         self.mock_tun_bridge.mod_flow(in_port=self.INT_OFPORT,
                                       dl_vlan=LV_ID, actions=action_string)
 
@@ -408,8 +409,8 @@ class TunnelTest(base.BaseTestCase):
                                               'sudo', 2, True)
         a.local_vlan_map[NET_UUID] = LVM
         a.tun_br_netport_map[NET_UUID] = ['3']
-        a.endpoint_add_net(mox.MockAnything, net_id=NET_UUID,
-            endpoint=self.TUN_ENDPOINT)
+        a.endpoint_add_net(
+            mox.MockAnything, net_id=NET_UUID, endpoint=self.TUN_ENDPOINT)
 
         self.mox.VerifyAll()
 
@@ -426,9 +427,9 @@ class TunnelTest(base.BaseTestCase):
                                               '10.0.0.1', self.NET_MAPPING,
                                               'sudo', 2, True)
         a.local_vlan_map[NET_UUID] = LVM
-        a.tun_br_netport_map[NET_UUID] = ['3',self.TUN_ENDPOINT_OFPORT]
-        a.endpoint_del_net(mox.MockAnything, net_id=NET_UUID,
-            endpoint=self.TUN_ENDPOINT)
+        a.tun_br_netport_map[NET_UUID] = ['3', self.TUN_ENDPOINT_OFPORT]
+        a.endpoint_del_net(
+            mox.MockAnything, net_id=NET_UUID, endpoint=self.TUN_ENDPOINT)
 
         self.mox.VerifyAll()
 
@@ -436,7 +437,7 @@ class TunnelTest(base.BaseTestCase):
         self.mock_tun_bridge.get_port_ofport(
             self.TUN_ENDPOINT_IF_NAME).AndReturn(self.TUN_ENDPOINT_OFPORT)
         self.mock_tun_bridge.delete_flows(in_port=self.INT_OFPORT,
-                                      dl_vlan=LV_ID)
+                                          dl_vlan=LV_ID)
 
         self.mox.ReplayAll()
         a = ovs_quantum_agent.OVSQuantumAgent(self.INT_BRIDGE,
@@ -445,11 +446,10 @@ class TunnelTest(base.BaseTestCase):
                                               'sudo', 2, True)
         a.local_vlan_map[NET_UUID] = LVM
         a.tun_br_netport_map[NET_UUID] = [self.TUN_ENDPOINT_OFPORT]
-        a.endpoint_del_net(mox.MockAnything, net_id=NET_UUID,
-            endpoint=self.TUN_ENDPOINT)
+        a.endpoint_del_net(
+            mox.MockAnything, net_id=NET_UUID, endpoint=self.TUN_ENDPOINT)
 
         self.mox.VerifyAll()
-
 
     def testDaemonLoop(self):
         reply2 = {'current': set(['tap0']),

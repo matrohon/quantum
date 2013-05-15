@@ -160,7 +160,7 @@ class OVSBridge:
         kwargs['mod-flows'] = True
         if "actions" not in kwargs:
             raise Exception(_("Must specify one or more actions"))
-        
+
         flow_expr_arr = self._build_flow_expr_arr(**kwargs)
         flow_expr_arr.append("actions=%s" % (kwargs["actions"]))
         flow_str = ",".join(flow_expr_arr)
