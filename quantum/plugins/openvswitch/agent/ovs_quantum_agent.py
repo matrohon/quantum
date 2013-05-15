@@ -281,13 +281,13 @@ class OVSQuantumAgent(sg_rpc.SecurityGroupAgentRpcCallbackMixin):
         tun_name = 'gre-%s' % tunnel_id
         self.tun_br.add_tunnel_port(tun_name, tunnel_ip)
 
-    def endpoint_add_net(self, context, **kwargs):
-        LOG.debug(_("endpoint_add_net received"))
+    def net_add_endpoint(self, context, **kwargs):
+        LOG.debug(_("net_add_endpoint received"))
         if not self.enable_tunneling:
             return
         endpoint = kwargs.get('endpoint')
         net_id = kwargs.get('net_id')
-        LOG.debug(_("endpoint_add_net with net_id %s and endpoint %s"),
+        LOG.debug(_("net_add_endpoint with net_id %s and endpoint %s"),
                   net_id, endpoint)
         if net_id not in self.local_vlan_map:
             return
@@ -297,7 +297,7 @@ class OVSQuantumAgent(sg_rpc.SecurityGroupAgentRpcCallbackMixin):
         segmentation_id = self.local_vlan_map[net_id].segmentation_id
 
         if endpoint_ofport is None:
-            LOG.debug(_("endpoint_add_net from unknown GRE endpoint %s :"
+            LOG.debug(_("net_add_endpoint from unknown GRE endpoint %s :"
                         " this must be me!"), endpoint)
             return
 
@@ -320,14 +320,14 @@ class OVSQuantumAgent(sg_rpc.SecurityGroupAgentRpcCallbackMixin):
                                  actions="set_tunnel:%s,%s" %
                                  (segmentation_id, endpoint_ofport))
 
-    def endpoint_del_net(self, context, **kwargs):
-        LOG.debug(_("endpoint_del_net received"))
+    def net_del_endpoint(self, context, **kwargs):
+        LOG.debug(_("net_del_endpoint received"))
         if not self.enable_tunneling:
             return
 
         endpoint = kwargs.get('endpoint')
         net_id = kwargs.get('net_id')
-        LOG.debug(_("endpoint_del_net with net_id %s and endpoint %s"),
+        LOG.debug(_("net_del_endpoint with net_id %s and endpoint %s"),
                   net_id, endpoint)
         if net_id not in self.tun_br_netport_map:
             return
@@ -382,8 +382,8 @@ class OVSQuantumAgent(sg_rpc.SecurityGroupAgentRpcCallbackMixin):
         if network_type == constants.TYPE_GRE:
             if self.enable_tunneling:
                 # outbound
-                endpoints = self.plugin_rpc.tunnel_add_net_to_endpoint(
-                    self.context, net_uuid, self.local_ip)
+                endpoints = self.plugin_rpc.endpoint_add_net(
+                    self.context, self.local_ip, net_uuid)
                 tun_br_ports = self.tun_br.get_port_name_list()
                 endpoints_ofports = []
                 for i in endpoints:
@@ -480,8 +480,8 @@ class OVSQuantumAgent(sg_rpc.SecurityGroupAgentRpcCallbackMixin):
                 self.tun_br.delete_flows(tun_id=lvm.segmentation_id)
                 self.tun_br.delete_flows(dl_vlan=lvm.vlan)
                 del self.tun_br_netport_map[net_uuid]
-                self.plugin_rpc.tunnel_del_net_from_endpoint(
-                    self.context, net_uuid, self.local_ip)
+                self.plugin_rpc.endpoint_del_net(
+                    self.context, self.local_ip, net_uuid)
         elif lvm.network_type == constants.TYPE_FLAT:
             if lvm.physical_network in self.phys_brs:
                 # outbound

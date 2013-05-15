@@ -154,10 +154,10 @@ class TunnelTest(base.BaseTestCase):
         self.mock_tun_bridge.add_flow(priority=3, tun_id=LS_ID,
                                       dl_dst=BCAST_MAC, actions=action_string)
 
-        self.mox.StubOutWithMock(rpc.PluginApi, 'tunnel_add_net_to_endpoint')
-        rpc.PluginApi.tunnel_add_net_to_endpoint(
+        self.mox.StubOutWithMock(rpc.PluginApi, 'endpoint_add_net')
+        rpc.PluginApi.endpoint_add_net(
             mox.IsA(context.ContextBase),
-            NET_UUID, '10.0.0.1').AndReturn([self.TUN_ENDPOINT])
+            '10.0.0.1', NET_UUID).AndReturn([self.TUN_ENDPOINT])
 
         self.mox.ReplayAll()
 
@@ -387,8 +387,8 @@ class TunnelTest(base.BaseTestCase):
                                               '10.0.0.1', self.NET_MAPPING,
                                               'sudo', 2, True)
         a.local_vlan_map[NET_UUID] = LVM
-        a.endpoint_add_net(
-            mox.MockAnything, net_id=NET_UUID, endpoint=self.TUN_ENDPOINT)
+        a.net_add_endpoint(
+            mox.MockAnything, endpoint=self.TUN_ENDPOINT, net_id=NET_UUID)
 
         self.mox.VerifyAll()
 
@@ -409,8 +409,8 @@ class TunnelTest(base.BaseTestCase):
                                               'sudo', 2, True)
         a.local_vlan_map[NET_UUID] = LVM
         a.tun_br_netport_map[NET_UUID] = ['3']
-        a.endpoint_add_net(
-            mox.MockAnything, net_id=NET_UUID, endpoint=self.TUN_ENDPOINT)
+        a.net_add_endpoint(
+            mox.MockAnything, endpoint=self.TUN_ENDPOINT, net_id=NET_UUID )
 
         self.mox.VerifyAll()
 
@@ -428,7 +428,7 @@ class TunnelTest(base.BaseTestCase):
                                               'sudo', 2, True)
         a.local_vlan_map[NET_UUID] = LVM
         a.tun_br_netport_map[NET_UUID] = ['3', self.TUN_ENDPOINT_OFPORT]
-        a.endpoint_del_net(
+        a.net_del_endpoint(
             mox.MockAnything, net_id=NET_UUID, endpoint=self.TUN_ENDPOINT)
 
         self.mox.VerifyAll()
@@ -446,7 +446,7 @@ class TunnelTest(base.BaseTestCase):
                                               'sudo', 2, True)
         a.local_vlan_map[NET_UUID] = LVM
         a.tun_br_netport_map[NET_UUID] = [self.TUN_ENDPOINT_OFPORT]
-        a.endpoint_del_net(
+        a.net_del_endpoint(
             mox.MockAnything, net_id=NET_UUID, endpoint=self.TUN_ENDPOINT)
 
         self.mox.VerifyAll()

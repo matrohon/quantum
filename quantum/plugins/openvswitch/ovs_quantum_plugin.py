@@ -162,10 +162,10 @@ class OVSRpcCallbacks(dhcp_rpc_base.DhcpRpcCallbackMixin,
         # Return the list of tunnels IP's to the agent
         return entry
 
-    def tunnel_add_net_to_endpoint(self, rpc_context, **kwargs):
+    def endpoint_add_net(self, rpc_context, **kwargs):
         net_id = kwargs.get('net_id')
         tunnel_ip = kwargs.get('tunnel_ip')
-        LOG.debug(_("tunnel_add_net_to_endpoint : net_id : %s; "
+        LOG.debug(_("endpoint_add_net : net_id : %s; "
                     "tunnel_ip : %s"), net_id, tunnel_ip)
 
         endpoints = ovs_db_v2.get_net_endpoints(net_id)
@@ -173,11 +173,11 @@ class OVSRpcCallbacks(dhcp_rpc_base.DhcpRpcCallbackMixin,
         ovs_db_v2.add_tunnel_binding(net_id, tunnel_ip)
 
         calling_endpoint = ovs_db_v2.get_tunnel_endpoint(tunnel_ip)
-        self.notifier.endpoint_add_net(rpc_context,
-                                       calling_endpoint, net_id)
+        self.notifier.net_add_endpoint(rpc_context,
+                                       net_id, calling_endpoint)
         return endpoints
 
-    def tunnel_del_net_from_endpoint(self, rpc_context, **kwargs):
+    def endpoint_del_net(self, rpc_context, **kwargs):
         net_id = kwargs.get('net_id')
         tunnel_ip = kwargs.get('tunnel_ip')
         LOG.debug(_("tunnel_del_net_endpoint : net_id : %s; "
@@ -186,8 +186,8 @@ class OVSRpcCallbacks(dhcp_rpc_base.DhcpRpcCallbackMixin,
         ovs_db_v2.del_tunnel_binding(net_id, tunnel_ip)
         LOG.debug(_("tunnel binding deleted from DB"))
         calling_endpoint = ovs_db_v2.get_tunnel_endpoint(tunnel_ip)
-        self.notifier.endpoint_del_net(rpc_context,
-                                       calling_endpoint, net_id)
+        self.notifier.net_del_endpoint(rpc_context, net_id,
+                                       calling_endpoint)
 
 
 class AgentNotifierApi(proxy.RpcProxy,
@@ -237,18 +237,18 @@ class AgentNotifierApi(proxy.RpcProxy,
                                        tunnel_id=tunnel_id),
                          topic=self.topic_tunnel_update)
 
-    def endpoint_add_net(self, context, endpoint, net_id):
+    def net_add_endpoint(self, context, net_id, endpoint):
         self.fanout_cast(context,
-                         self.make_msg('endpoint_add_net',
-                                       endpoint=endpoint,
-                                       net_id=net_id),
+                         self.make_msg('net_add_endpoint',
+                                       net_id=net_id,
+                                       endpoint=endpoint),
                          topic=self.topic_tunnel_update)
 
-    def endpoint_del_net(self, context, endpoint, net_id):
+    def net_del_endpoint(self, context, net_id, endpoint):
         self.fanout_cast(context,
-                         self.make_msg('endpoint_del_net',
-                                       endpoint=endpoint,
-                                       net_id=net_id),
+                         self.make_msg('net_del_endpoint',
+                                       net_id=net_id,
+                                       endpoint=endpoint),
                          topic=self.topic_tunnel_update)
 
 

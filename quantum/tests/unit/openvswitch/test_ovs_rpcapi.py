@@ -89,23 +89,23 @@ class rpcApiTestCase(base.BaseTestCase):
                            'tunnel_update', rpc_method='fanout_cast',
                            tunnel_ip='fake_ip', tunnel_id='fake_id')
 
-    def test_endpoint_add_net(self):
+    def test_net_add_endpoint(self):
         rpcapi = povs.AgentNotifierApi(topics.AGENT)
         self._test_ovs_api(rpcapi,
                            topics.get_topic_name(topics.AGENT,
                                                  constants.TUNNEL,
                                                  topics.UPDATE),
-                           'endpoint_add_net', rpc_method='fanout_cast',
-                           endpoint='fake_endpoint', net_id='fake_id')
+                           'net_add_endpoint', rpc_method='fanout_cast',
+                           net_id='fake_id', endpoint='fake_endpoint')
 
-    def test_endpoint_del_net(self):
+    def test_net_del_endpoint(self):
         rpcapi = povs.AgentNotifierApi(topics.AGENT)
         self._test_ovs_api(rpcapi,
                            topics.get_topic_name(topics.AGENT,
                                                  constants.TUNNEL,
                                                  topics.UPDATE),
-                           'endpoint_del_net', rpc_method='fanout_cast',
-                           endpoint='fake_endpoint', net_id='fake_id')
+                           'net_del_endpoint', rpc_method='fanout_cast',
+                           net_id='fake_id', endpoint='fake_endpoint')
 
     def test_device_details(self):
         rpcapi = agent_rpc.PluginApi(topics.PLUGIN)
@@ -134,14 +134,14 @@ class rpcApiTestCase(base.BaseTestCase):
                            device='fake_device',
                            agent_id='fake_agent_id')
 
-    def test_tunnel_add_net_to_endpoint(self):
+    def test_endpoint_add_net(self):
         rpcapi = agent_rpc.PluginApi(topics.PLUGIN)
         self._test_ovs_api(rpcapi, topics.PLUGIN,
-                           'tunnel_add_net_to_endpoint', rpc_method='call',
-                           net_id='fake_id', tunnel_ip='fake_tunnel_ip')
+                           'endpoint_add_net', rpc_method='call',
+                           tunnel_ip='fake_tunnel_ip', net_id='fake_id')
 
-    def test_tunnel_del_net_from_endpoint(self):
+    def test_endpoint_del_net(self):
         rpcapi = agent_rpc.PluginApi(topics.PLUGIN)
         self._test_ovs_api(rpcapi, topics.PLUGIN,
-                           'tunnel_del_net_from_endpoint', rpc_method='call',
-                           net_id='fake_id', tunnel_ip='fake_tunnel_ip')
+                           'endpoint_del_net', rpc_method='call',
+                           tunnel_ip='fake_tunnel_ip', net_id='fake_id')
