@@ -89,6 +89,24 @@ class rpcApiTestCase(base.BaseTestCase):
                            'tunnel_update', rpc_method='fanout_cast',
                            tunnel_ip='fake_ip', tunnel_id='fake_id')
 
+    def test_net_add_endpoint(self):
+        rpcapi = povs.AgentNotifierApi(topics.AGENT)
+        self._test_ovs_api(rpcapi,
+                           topics.get_topic_name(topics.AGENT,
+                                                 constants.TUNNEL,
+                                                 topics.UPDATE),
+                           'net_add_endpoint', rpc_method='fanout_cast',
+                           net_id='fake_id', endpoint='fake_endpoint')
+
+    def test_net_del_endpoint(self):
+        rpcapi = povs.AgentNotifierApi(topics.AGENT)
+        self._test_ovs_api(rpcapi,
+                           topics.get_topic_name(topics.AGENT,
+                                                 constants.TUNNEL,
+                                                 topics.UPDATE),
+                           'net_del_endpoint', rpc_method='fanout_cast',
+                           net_id='fake_id', endpoint='fake_endpoint')
+
     def test_device_details(self):
         rpcapi = agent_rpc.PluginApi(topics.PLUGIN)
         self._test_ovs_api(rpcapi, topics.PLUGIN,
@@ -115,3 +133,15 @@ class rpcApiTestCase(base.BaseTestCase):
                            'update_device_up', rpc_method='call',
                            device='fake_device',
                            agent_id='fake_agent_id')
+
+    def test_endpoint_add_net(self):
+        rpcapi = agent_rpc.PluginApi(topics.PLUGIN)
+        self._test_ovs_api(rpcapi, topics.PLUGIN,
+                           'endpoint_add_net', rpc_method='call',
+                           tunnel_ip='fake_tunnel_ip', net_id='fake_id')
+
+    def test_endpoint_del_net(self):
+        rpcapi = agent_rpc.PluginApi(topics.PLUGIN)
+        self._test_ovs_api(rpcapi, topics.PLUGIN,
+                           'endpoint_del_net', rpc_method='call',
+                           tunnel_ip='fake_tunnel_ip', net_id='fake_id')
