@@ -23,6 +23,7 @@ import testtools
 
 from quantum.agent.linux import ip_lib
 from quantum.agent.linux import utils
+from quantum.openstack.common.rpc import common as rpc_common
 from quantum.plugins.linuxbridge.agent import linuxbridge_quantum_agent
 from quantum.plugins.linuxbridge.common import constants as lconst
 from quantum.tests import base
@@ -41,6 +42,7 @@ class TestLinuxBridge(base.BaseTestCase):
 
     def test_ensure_physical_in_bridge_invalid(self):
         result = self.linux_bridge.ensure_physical_in_bridge('network_id',
+                                                             lconst.TYPE_VLAN,
                                                              'physnetx',
                                                              7)
         self.assertFalse(result)
@@ -49,14 +51,14 @@ class TestLinuxBridge(base.BaseTestCase):
         with mock.patch.object(self.linux_bridge,
                                'ensure_flat_bridge') as flat_bridge_func:
             self.linux_bridge.ensure_physical_in_bridge(
-                'network_id', 'physnet1', lconst.FLAT_VLAN_ID)
+                'network_id', lconst.TYPE_FLAT, 'physnet1', None)
         self.assertTrue(flat_bridge_func.called)
 
     def test_ensure_physical_in_bridge_vlan(self):
         with mock.patch.object(self.linux_bridge,
                                'ensure_vlan_bridge') as vlan_bridge_func:
             self.linux_bridge.ensure_physical_in_bridge(
-                'network_id', 'physnet1', 7)
+                'network_id', lconst.TYPE_VLAN, 'physnet1', 7)
         self.assertTrue(vlan_bridge_func.called)
 
 
@@ -338,16 +340,19 @@ class TestLinuxBridgeManager(base.BaseTestCase):
 
     def test_ensure_physical_in_bridge(self):
         self.assertFalse(
-            self.lbm.ensure_physical_in_bridge("123", "phys", "1")
+            self.lbm.ensure_physical_in_bridge("123", lconst.TYPE_VLAN,
+                                               "phys", "1")
         )
         with mock.patch.object(self.lbm, "ensure_flat_bridge") as flbr_fn:
             self.assertTrue(
-                self.lbm.ensure_physical_in_bridge("123", "physnet1", "-1")
+                self.lbm.ensure_physical_in_bridge("123", lconst.TYPE_FLAT,
+                                                   "physnet1", None)
             )
             self.assertTrue(flbr_fn.called)
         with mock.patch.object(self.lbm, "ensure_vlan_bridge") as vlbr_fn:
             self.assertTrue(
-                self.lbm.ensure_physical_in_bridge("123", "physnet1", "1")
+                self.lbm.ensure_physical_in_bridge("123", lconst.TYPE_VLAN,
+                                                   "physnet1", "1")
             )
             self.assertTrue(vlbr_fn.called)
 
@@ -355,7 +360,8 @@ class TestLinuxBridgeManager(base.BaseTestCase):
         with mock.patch.object(self.lbm, "device_exists") as de_fn:
             de_fn.return_value = False
             self.assertFalse(
-                self.lbm.add_tap_interface("123", "physnet1", "1", "tap1")
+                self.lbm.add_tap_interface("123", lconst.TYPE_VLAN,
+                                           "physnet1", "1", "tap1")
             )
 
             de_fn.return_value = True
@@ -366,25 +372,33 @@ class TestLinuxBridgeManager(base.BaseTestCase):
             ) as (en_fn, exec_fn, get_br):
                 exec_fn.return_value = False
                 get_br.return_value = True
-                self.assertTrue(self.lbm.add_tap_interface("123", "physnet1",
-                                                           "-2", "tap1"))
+                self.assertTrue(self.lbm.add_tap_interface("123",
+                                                           lconst.TYPE_LOCAL,
+                                                           "physnet1", None,
+                                                           "tap1"))
                 en_fn.assert_called_with("123")
 
                 get_br.return_value = False
                 exec_fn.return_value = True
-                self.assertFalse(self.lbm.add_tap_interface("123", "physnet1",
-                                                            "-2", "tap1"))
+                self.assertFalse(self.lbm.add_tap_interface("123",
+                                                            lconst.TYPE_LOCAL,
+                                                            "physnet1", None,
+                                                            "tap1"))
 
             with mock.patch.object(self.lbm,
                                    "ensure_physical_in_bridge") as ens_fn:
                 ens_fn.return_value = False
-                self.assertFalse(self.lbm.add_tap_interface("123", "physnet1",
-                                                            "1", "tap1"))
+                self.assertFalse(self.lbm.add_tap_interface("123",
+                                                            lconst.TYPE_VLAN,
+                                                            "physnet1", "1",
+                                                            "tap1"))
 
     def test_add_interface(self):
         with mock.patch.object(self.lbm, "add_tap_interface") as add_tap:
-            self.lbm.add_interface("123", "physnet-1", "1", "234")
-            add_tap.assert_called_with("123", "physnet-1", "1", "tap234")
+            self.lbm.add_interface("123", lconst.TYPE_VLAN, "physnet-1",
+                                   "1", "234")
+            add_tap.assert_called_with("123", lconst.TYPE_VLAN, "physnet-1",
+                                       "1", "tap234")
 
     def test_delete_vlan_bridge(self):
         with contextlib.nested(
@@ -508,8 +522,46 @@ class TestLinuxBridgeRpcCallbacks(base.BaseTestCase):
             self.lb_rpc.port_update("unused_context", port=port,
                                     vlan_id="1", physical_network="physnet1")
             self.assertFalse(reffw_fn.called)
-            addif_fn.assert_called_with(port["network_id"],
+            addif_fn.assert_called_with(port["network_id"], lconst.TYPE_VLAN,
                                         "physnet1", "1", port["id"])
+
+            self.lb_rpc.port_update("unused_context", port=port,
+                                    network_type=lconst.TYPE_VLAN,
+                                    segmentation_id="2",
+                                    physical_network="physnet1")
+            self.assertFalse(reffw_fn.called)
+            addif_fn.assert_called_with(port["network_id"], lconst.TYPE_VLAN,
+                                        "physnet1", "2", port["id"])
+
+            self.lb_rpc.port_update("unused_context", port=port,
+                                    vlan_id=lconst.FLAT_VLAN_ID,
+                                    physical_network="physnet1")
+            self.assertFalse(reffw_fn.called)
+            addif_fn.assert_called_with(port["network_id"], lconst.TYPE_FLAT,
+                                        "physnet1", None, port["id"])
+
+            self.lb_rpc.port_update("unused_context", port=port,
+                                    network_type=lconst.TYPE_FLAT,
+                                    segmentation_id=None,
+                                    physical_network="physnet1")
+            self.assertFalse(reffw_fn.called)
+            addif_fn.assert_called_with(port["network_id"], lconst.TYPE_FLAT,
+                                        "physnet1", None, port["id"])
+
+            self.lb_rpc.port_update("unused_context", port=port,
+                                    vlan_id=lconst.LOCAL_VLAN_ID,
+                                    physical_network=None)
+            self.assertFalse(reffw_fn.called)
+            addif_fn.assert_called_with(port["network_id"], lconst.TYPE_LOCAL,
+                                        None, None, port["id"])
+
+            self.lb_rpc.port_update("unused_context", port=port,
+                                    network_type=lconst.TYPE_LOCAL,
+                                    segmentation_id=None,
+                                    physical_network=None)
+            self.assertFalse(reffw_fn.called)
+            addif_fn.assert_called_with(port["network_id"], lconst.TYPE_LOCAL,
+                                        None, None, port["id"])
 
             port["admin_state_up"] = False
             port["security_groups"] = True
@@ -523,3 +575,37 @@ class TestLinuxBridgeRpcCallbacks(base.BaseTestCase):
                 "tap123",
                 self.lb_rpc.agent.agent_id
             )
+
+    def test_port_update_plugin_rpc_failed(self):
+        with contextlib.nested(
+                mock.patch.object(self.lb_rpc.agent.br_mgr,
+                                  "get_tap_device_name"),
+                mock.patch.object(self.lb_rpc.agent.br_mgr,
+                                  "udev_get_tap_devices"),
+                mock.patch.object(self.lb_rpc.agent.br_mgr,
+                                  "get_bridge_name"),
+                mock.patch.object(self.lb_rpc.agent.br_mgr,
+                                  "remove_interface"),
+                mock.patch.object(self.lb_rpc.agent.br_mgr, "add_interface"),
+                mock.patch.object(self.lb_rpc.sg_agent,
+                                  "refresh_firewall", create=True),
+                mock.patch.object(self.lb_rpc.agent,
+                                  "plugin_rpc", create=True),
+                mock.patch.object(linuxbridge_quantum_agent.LOG, 'error'),
+        ) as (get_tap_fn, udev_fn, _, _, _, _, plugin_rpc, log):
+            get_tap_fn.return_value = "tap123"
+            udev_fn.return_value = ["tap123", "tap124"]
+            port = {"admin_state_up": True,
+                    "id": "1234-5678",
+                    "network_id": "123-123"}
+            plugin_rpc.update_device_up.side_effect = rpc_common.Timeout
+            self.lb_rpc.port_update(mock.Mock(), port=port)
+            self.assertTrue(plugin_rpc.update_device_up.called)
+            self.assertEqual(log.call_count, 1)
+
+            log.reset_mock()
+            port["admin_state_up"] = False
+            plugin_rpc.update_device_down.side_effect = rpc_common.Timeout
+            self.lb_rpc.port_update(mock.Mock(), port=port)
+            self.assertTrue(plugin_rpc.update_device_down.called)
+            self.assertEqual(log.call_count, 1)

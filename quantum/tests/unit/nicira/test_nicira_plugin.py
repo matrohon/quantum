@@ -757,7 +757,7 @@ class TestNiciraQoSQueue(NiciraPluginV2TestCase):
         quantum_context = context.Context('', 'not_admin')
         port = self._update('ports', port['port']['id'], data,
                             quantum_context=quantum_context)
-        self.assertEqual(ext_qos.QUEUE not in port['port'], True)
+        self.assertFalse(ext_qos.QUEUE in port['port'])
 
     def test_rxtx_factor(self):
         with self.qos_queue(max=10) as q1:
@@ -837,6 +837,26 @@ class NiciraQuantumNVPOutOfSync(test_l3_plugin.L3NatTestCaseBase,
         net = self.deserialize('json', req.get_response(self.api))
         self.assertEqual(net['port']['status'],
                          constants.PORT_STATUS_ERROR)
+
+    def test_create_port_on_network_not_in_nvp(self):
+        res = self._create_network('json', 'net1', True)
+        net1 = self.deserialize('json', res)
+        self.fc._fake_lswitch_dict.clear()
+        res = self._create_port('json', net1['network']['id'])
+        port = self.deserialize('json', res)
+        self.assertEqual(port['port']['status'], constants.PORT_STATUS_ERROR)
+
+    def test_update_port_not_in_nvp(self):
+        res = self._create_network('json', 'net1', True)
+        net1 = self.deserialize('json', res)
+        res = self._create_port('json', net1['network']['id'])
+        port = self.deserialize('json', res)
+        self.fc._fake_lswitch_lport_dict.clear()
+        data = {'port': {'name': 'error_port'}}
+        req = self.new_update_request('ports', data, port['port']['id'])
+        port = self.deserialize('json', req.get_response(self.api))
+        self.assertEqual(port['port']['status'], constants.PORT_STATUS_ERROR)
+        self.assertEqual(port['port']['name'], 'error_port')
 
     def test_delete_port_and_network_not_in_nvp(self):
         res = self._create_network('json', 'net1', True)

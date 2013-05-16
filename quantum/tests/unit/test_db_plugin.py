@@ -2302,12 +2302,20 @@ class TestSubnetsV2(QuantumDbPluginV2TestCase):
             # verify the response has each key with the correct value
             for k in keys:
                 self.assertIn(k, subnet['subnet'])
-                self.assertEqual(subnet['subnet'][k], keys[k])
+                if isinstance(keys[k], list):
+                    self.assertEqual(sorted(subnet['subnet'][k]),
+                                     sorted(keys[k]))
+                else:
+                    self.assertEqual(subnet['subnet'][k], keys[k])
             # verify the configured validations are correct
             if expected:
                 for k in expected:
                     self.assertIn(k, subnet['subnet'])
-                    self.assertEqual(subnet['subnet'][k], expected[k])
+                    if isinstance(expected[k], list):
+                        self.assertEqual(sorted(subnet['subnet'][k]),
+                                         sorted(expected[k]))
+                    else:
+                        self.assertEqual(subnet['subnet'][k], expected[k])
             return subnet
 
     def test_create_subnet(self):
@@ -2687,7 +2695,7 @@ class TestSubnetsV2(QuantumDbPluginV2TestCase):
         self._test_create_subnet(expected=expected,
                                  gateway_ip=gateway)
 
-    def test_create_force_subnet_gw_values(self):
+    def test_create_subnet_gw_outside_cidr_force_on_returns_400(self):
         cfg.CONF.set_override('force_gateway_on_subnet', True)
         with self.network() as network:
             self._create_subnet(self.fmt,
@@ -2695,6 +2703,24 @@ class TestSubnetsV2(QuantumDbPluginV2TestCase):
                                 '10.0.0.0/24',
                                 400,
                                 gateway_ip='100.0.0.1')
+
+    def test_create_subnet_gw_of_network_force_on_returns_400(self):
+        cfg.CONF.set_override('force_gateway_on_subnet', True)
+        with self.network() as network:
+            self._create_subnet(self.fmt,
+                                network['network']['id'],
+                                '10.0.0.0/24',
+                                400,
+                                gateway_ip='10.0.0.0')
+
+    def test_create_subnet_gw_bcast_force_on_returns_400(self):
+        cfg.CONF.set_override('force_gateway_on_subnet', True)
+        with self.network() as network:
+            self._create_subnet(self.fmt,
+                                network['network']['id'],
+                                '10.0.0.0/24',
+                                400,
+                                gateway_ip='10.0.0.255')
 
     def test_create_subnet_with_allocation_pool(self):
         gateway_ip = '10.0.0.1'
@@ -2955,6 +2981,16 @@ class TestSubnetsV2(QuantumDbPluginV2TestCase):
         with self.network(shared=True) as network:
             with self.subnet(network=network) as subnet:
                 data = {'subnet': {'shared': True}}
+                req = self.new_update_request('subnets', data,
+                                              subnet['subnet']['id'])
+                res = req.get_response(self.api)
+                self.assertEqual(res.status_int, 400)
+
+    def test_update_subnet_gw_outside_cidr_force_on_returns_400(self):
+        cfg.CONF.set_override('force_gateway_on_subnet', True)
+        with self.network() as network:
+            with self.subnet(network=network) as subnet:
+                data = {'subnet': {'gateway_ip': '100.0.0.1'}}
                 req = self.new_update_request('subnets', data,
                                               subnet['subnet']['id'])
                 res = req.get_response(self.api)
