@@ -165,7 +165,7 @@ class OVSRpcCallbacks(dhcp_rpc_base.DhcpRpcCallbackMixin,
     def endpoint_add_net(self, rpc_context, **kwargs):
         net_id = kwargs.get('net_id')
         tunnel_ip = kwargs.get('tunnel_ip')
-        LOG.debug(_("endpoint_add_net : net_id : %(net_id), "
+        LOG.debug(_("endpoint_add_net : net_id : %(net_id)s, "
                     "tunnel_ip : %(tunnel_ip)s"),
                   {'net_id': net_id, 'tunnel_ip': tunnel_ip})
 
