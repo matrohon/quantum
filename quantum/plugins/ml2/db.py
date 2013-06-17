@@ -14,6 +14,7 @@
 #    under the License.
 
 from sqlalchemy.orm import exc
+from sqlalchemy.sql import func
 
 from quantum.db import api as db_api
 from quantum.db import models_v2
@@ -22,7 +23,9 @@ from quantum import manager
 from quantum.openstack.common import log
 from quantum.openstack.common import uuidutils
 from quantum.plugins.ml2 import driver_api as api
+from quantum.plugins.ml2.drivers import type_gre
 from quantum.plugins.ml2 import models
+
 
 LOG = log.getLogger(__name__)
 
@@ -101,3 +104,38 @@ def get_port_and_sgs(port_id):
         port_dict['fixed_ips'] = [ip['ip_address']
                                   for ip in port['fixed_ips']]
         return port_dict
+
+
+def get_gre_endpoints():
+    """Get every gre endpoints from database."""
+
+    LOG.debug(_("get_gre_endpoints() called"))
+    session = db_api.get_session()
+
+    with session.begin(subtransactions=True):
+        gre_endpoints = session.query(type_gre.GreEndpoints)
+        return [{'id': gre_endpoint.id,
+                 'ip_address': gre_endpoint.ip_address}
+                for gre_endpoint in gre_endpoints]
+
+
+def _generate_gre_endpoint_id(session):
+    max_tunnel_id = session.query(
+        func.max(type_gre.GreEndpoints.id)).scalar() or 0
+    return max_tunnel_id + 1
+
+
+def add_gre_endpoint(ip):
+    LOG.debug(_("add_gre_endpoint() called for ip %s"), ip)
+    session = db_api.get_session()
+    with session.begin(subtransactions=True):
+        try:
+            gre_endpoint = (session.query(type_gre.GreEndpoints).
+                            filter_by(ip_address=ip).
+                            with_lockmode('update').one())
+        except exc.NoResultFound:
+            gre_endpoint_id = _generate_gre_endpoint_id(session)
+            gre_endpoint = type_gre.GreEndpoints(ip, gre_endpoint_id)
+            session.add(gre_endpoint)
+            session.flush()
+        return gre_endpoint

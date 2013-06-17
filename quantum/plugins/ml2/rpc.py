@@ -26,6 +26,7 @@ from quantum.openstack.common import log
 from quantum.openstack.common.rpc import proxy
 from quantum.plugins.ml2 import db
 from quantum.plugins.ml2 import driver_api as api
+from quantum.plugins.ml2.drivers import type_gre
 
 LOG = log.getLogger(__name__)
 
@@ -158,6 +159,23 @@ class RpcCallbacks(dhcp_rpc_base.DhcpRpcCallbackMixin,
 
     # TODO(rkukura) Add tunnel_sync() here if not implemented via a
     # driver.
+    def tunnel_sync(self, rpc_context, **kwargs):
+        """Update new tunnel.
+
+        Updates the datbase with the tunnel IP. All listening agents will also
+        be notified about the new tunnel IP.
+        """
+        tunnel_ip = kwargs.get('tunnel_ip')
+        # Update the database with the IP
+        tunnel = db.add_gre_endpoint(tunnel_ip)
+        tunnels = db.get_gre_endpoints()
+        entry = dict()
+        entry['tunnels'] = tunnels
+        # Notify all other listening agents
+        self.notifier.tunnel_update(rpc_context, tunnel.ip_address,
+                                    tunnel.id)
+        # Return the list of tunnels IP's to the agent
+        return entry
 
 
 class AgentNotifierApi(proxy.RpcProxy,
@@ -180,8 +198,9 @@ class AgentNotifierApi(proxy.RpcProxy,
                                                        topics.PORT,
                                                        topics.UPDATE)
 
-        # TODO(rkukura): Add topic_tunnel_update here if not
-        # implemented via a driver.
+        self.topic_tunnel_update = topics.get_topic_name(topic,
+                                                         type_gre.TUNNEL,
+                                                         topics.UPDATE)
 
     def network_delete(self, context, network_id):
         self.fanout_cast(context,
@@ -199,5 +218,9 @@ class AgentNotifierApi(proxy.RpcProxy,
                                        physical_network=physical_network),
                          topic=self.topic_port_update)
 
-    # TODO(rkukura): Add tunnel_update() here if not
-    # implemented via a driver.
+    def tunnel_update(self, context, tunnel_ip, tunnel_id):
+        self.fanout_cast(context,
+                         self.make_msg('tunnel_update',
+                                       tunnel_ip=tunnel_ip,
+                                       tunnel_id=tunnel_id),
+                         topic=self.topic_tunnel_update)
