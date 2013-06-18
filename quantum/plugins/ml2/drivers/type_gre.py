@@ -18,18 +18,16 @@ import sys
 from oslo.config import cfg
 import sqlalchemy as sa
 from sqlalchemy.orm import exc as sa_exc
+from sqlalchemy.sql import func
 
 from quantum.common import exceptions as exc
 from quantum.db import api as db_api
 from quantum.db import model_base
 from quantum.openstack.common import log
 from quantum.plugins.ml2 import driver_api as api
+from quantum.plugins.ml2.drivers import type_tunnel
 
 LOG = log.getLogger(__name__)
-
-TYPE_GRE = 'gre'
-
-TUNNEL = 'tunnel'
 
 gre_opts = [
     cfg.ListOpt('tunnel_id_ranges',
@@ -42,10 +40,11 @@ gre_opts = [
 cfg.CONF.register_opts(gre_opts, "ml2_type_gre")
 
 
-class GreTypeDriver(api.TypeDriver):
+class GreTypeDriver(api.TypeDriver,
+                   type_tunnel.TunnelTypeDriver ):
 
     def get_type(self):
-        return TYPE_GRE
+        return type_tunnel.TYPE_GRE
 
     def initialize(self):
         self.gre_id_ranges = []
@@ -94,7 +93,7 @@ class GreTypeDriver(api.TypeDriver):
                 LOG.debug(_("Allocating gre tunnel id  %(gre_id)s"),
                           {'gre_id': alloc.gre_id})
                 alloc.allocated = True
-                return {api.NETWORK_TYPE: TYPE_GRE,
+                return {api.NETWORK_TYPE: type_tunnel.TYPE_GRE,
                         api.PHYSICAL_NETWORK: None,
                         api.SEGMENTATION_ID: alloc.gre_id}
 
@@ -169,6 +168,40 @@ class GreTypeDriver(api.TypeDriver):
             for gre_id in sorted(gre_ids):
                 alloc = GreAllocation(gre_id)
                 session.add(alloc)
+
+    def get_endpoints(self):
+        """Get every gre endpoints from database."""
+    
+        LOG.debug(_("get_gre_endpoints() called"))
+        session = db_api.get_session()
+    
+        with session.begin(subtransactions=True):
+            gre_endpoints = session.query(self.GreEndpoints)
+            return [{'id': gre_endpoint.id,
+                     'ip_address': gre_endpoint.ip_address}
+                    for gre_endpoint in gre_endpoints]
+    
+    
+    def _generate_gre_endpoint_id(self, session):
+        max_tunnel_id = session.query(
+            func.max(self.GreEndpoints.id)).scalar() or 0
+        return max_tunnel_id + 1
+    
+    
+    def add_endpoint(self, ip):
+        LOG.debug(_("add_gre_endpoint() called for ip %s"), ip)
+        session = db_api.get_session()
+        with session.begin(subtransactions=True):
+            try:
+                gre_endpoint = (session.query(self.GreEndpoints).
+                                filter_by(ip_address=ip).
+                                with_lockmode('update').one())
+            except sa_exc.NoResultFound:
+                gre_endpoint_id = self._generate_gre_endpoint_id(session)
+                gre_endpoint = self.GreEndpoints(ip, gre_endpoint_id)
+                session.add(gre_endpoint)
+                session.flush()
+            return gre_endpoint
 
 
 class GreAllocation(model_base.BASEV2):

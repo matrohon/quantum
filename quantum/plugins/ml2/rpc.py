@@ -27,7 +27,7 @@ from quantum.openstack.common.rpc import proxy
 from quantum.plugins.ml2 import db
 from quantum.plugins.ml2 import driver_api as api
 from quantum.plugins.ml2.drivers import type_gre
-
+from quantum.plugins.ml2.drivers import type_tunnel
 LOG = log.getLogger(__name__)
 
 TAP_DEVICE_PREFIX = 'tap'
@@ -36,7 +36,8 @@ TAP_DEVICE_PREFIX_LENGTH = 3
 
 class RpcCallbacks(dhcp_rpc_base.DhcpRpcCallbackMixin,
                    l3_rpc_base.L3RpcCallbackMixin,
-                   sg_db_rpc.SecurityGroupServerRpcCallbackMixin):
+                   sg_db_rpc.SecurityGroupServerRpcCallbackMixin,
+                   type_tunnel.TunnelRpcCallbackMixin):
 
     RPC_API_VERSION = '1.1'
     # history
@@ -44,6 +45,7 @@ class RpcCallbacks(dhcp_rpc_base.DhcpRpcCallbackMixin,
     #   1.1 Support Security Group RPC
 
     def __init__(self, notifier):
+        super(RpcCallbacks, self).__init__()
         self.notifier = notifier
 
     def create_rpc_dispatcher(self):
@@ -157,29 +159,10 @@ class RpcCallbacks(dhcp_rpc_base.DhcpRpcCallbackMixin,
             if port.status != q_const.PORT_STATUS_ACTIVE:
                 port.status = q_const.PORT_STATUS_ACTIVE
 
-    # TODO(rkukura) Add tunnel_sync() here if not implemented via a
-    # driver.
-    def tunnel_sync(self, rpc_context, **kwargs):
-        """Update new tunnel.
-
-        Updates the datbase with the tunnel IP. All listening agents will also
-        be notified about the new tunnel IP.
-        """
-        tunnel_ip = kwargs.get('tunnel_ip')
-        # Update the database with the IP
-        tunnel = db.add_gre_endpoint(tunnel_ip)
-        tunnels = db.get_gre_endpoints()
-        entry = dict()
-        entry['tunnels'] = tunnels
-        # Notify all other listening agents
-        self.notifier.tunnel_update(rpc_context, tunnel.ip_address,
-                                    tunnel.id)
-        # Return the list of tunnels IP's to the agent
-        return entry
-
 
 class AgentNotifierApi(proxy.RpcProxy,
-                       sg_rpc.SecurityGroupAgentRpcApiMixin):
+                       sg_rpc.SecurityGroupAgentRpcApiMixin,
+                       type_tunnel.TunnelAgentRpcApiMixin):
     """Agent side of the openvswitch rpc API.
 
     API version history:
@@ -198,9 +181,6 @@ class AgentNotifierApi(proxy.RpcProxy,
                                                        topics.PORT,
                                                        topics.UPDATE)
 
-        self.topic_tunnel_update = topics.get_topic_name(topic,
-                                                         type_gre.TUNNEL,
-                                                         topics.UPDATE)
 
     def network_delete(self, context, network_id):
         self.fanout_cast(context,
@@ -218,9 +198,3 @@ class AgentNotifierApi(proxy.RpcProxy,
                                        physical_network=physical_network),
                          topic=self.topic_port_update)
 
-    def tunnel_update(self, context, tunnel_ip, tunnel_id):
-        self.fanout_cast(context,
-                         self.make_msg('tunnel_update',
-                                       tunnel_ip=tunnel_ip,
-                                       tunnel_id=tunnel_id),
-                         topic=self.topic_tunnel_update)
