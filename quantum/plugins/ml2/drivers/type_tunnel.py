@@ -72,15 +72,14 @@ class TunnelRpcCallbackMixin(object):
 
 class TunnelAgentRpcApiMixin(object):
     
-    def __init__(self, topic):
-        
-        self.topic_tunnel_update = topics.get_topic_name(topic,
-                                                         TUNNEL,
-                                                         topics.UPDATE)
+    def _get_tunnel_update_topic(self):
+        return topics.get_topic_name(self.topic,
+                                     TUNNEL,
+                                     topics.UPDATE)
 
     def tunnel_update(self, context, tunnel_ip, tunnel_id):
         self.fanout_cast(context,
                          self.make_msg('tunnel_update',
                                        tunnel_ip=tunnel_ip,
                                        tunnel_id=tunnel_id),
-                         topic=self.topic_tunnel_update)
+                         topic=self._get_tunnel_update_topic())

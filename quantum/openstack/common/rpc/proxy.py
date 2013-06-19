@@ -58,7 +58,7 @@ class RpcProxy(object):
         if serializer is None:
             serializer = rpc_serializer.NoOpSerializer()
         self.serializer = serializer
-        super(RpcProxy, self).__init__()
+        #super(RpcProxy, self).__init__()
 
     def _set_version(self, msg, vers):
         """Helper method to set the version in a message.

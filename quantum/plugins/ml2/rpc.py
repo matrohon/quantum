@@ -44,10 +44,9 @@ class RpcCallbacks(dhcp_rpc_base.DhcpRpcCallbackMixin,
     #   1.0 Initial version (from openvswitch/linuxbridge)
     #   1.1 Support Security Group RPC
 
-    def __init__(self, notifier):
-        super(RpcCallbacks, self).__init__()
-        self.notifier = notifier
-
+    def __init__(self, notifier, type_manager):
+        super(RpcCallbacks, self).__init__(notifier, type_manager)
+        
     def create_rpc_dispatcher(self):
         '''Get the rpc dispatcher for this manager.
 

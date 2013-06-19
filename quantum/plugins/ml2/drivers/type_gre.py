@@ -40,6 +40,34 @@ gre_opts = [
 cfg.CONF.register_opts(gre_opts, "ml2_type_gre")
 
 
+class GreAllocation(model_base.BASEV2):
+
+    __tablename__ = 'ml2_gre_allocations'
+
+    gre_id = sa.Column(sa.Integer, nullable=False, primary_key=True,
+                       autoincrement=False)
+    allocated = sa.Column(sa.Boolean, nullable=False)
+
+    def __init__(self, gre_id):
+        self.gre_id = gre_id
+        self.allocated = False
+
+
+class GreEndpoints(model_base.BASEV2):
+    """Represents tunnel endpoint in RPC mode."""
+    __tablename__ = 'ml2_gre_endpoints'
+
+    ip_address = sa.Column(sa.String(64), primary_key=True)
+    id = sa.Column(sa.Integer, nullable=False)
+
+    def __init__(self, ip_address, id):
+        self.ip_address = ip_address
+        self.id = id
+
+    def __repr__(self):
+        return "<TunnelEndpoint(%s,%s)>" % (self.ip_address, self.id)
+
+
 class GreTypeDriver(api.TypeDriver,
                    type_tunnel.TunnelTypeDriver ):
 
@@ -176,7 +204,7 @@ class GreTypeDriver(api.TypeDriver,
         session = db_api.get_session()
     
         with session.begin(subtransactions=True):
-            gre_endpoints = session.query(self.GreEndpoints)
+            gre_endpoints = session.query(GreEndpoints)
             return [{'id': gre_endpoint.id,
                      'ip_address': gre_endpoint.ip_address}
                     for gre_endpoint in gre_endpoints]
@@ -184,7 +212,7 @@ class GreTypeDriver(api.TypeDriver,
     
     def _generate_gre_endpoint_id(self, session):
         max_tunnel_id = session.query(
-            func.max(self.GreEndpoints.id)).scalar() or 0
+            func.max(GreEndpoints.id)).scalar() or 0
         return max_tunnel_id + 1
     
     
@@ -193,40 +221,14 @@ class GreTypeDriver(api.TypeDriver,
         session = db_api.get_session()
         with session.begin(subtransactions=True):
             try:
-                gre_endpoint = (session.query(self.GreEndpoints).
+                gre_endpoint = (session.query(GreEndpoints).
                                 filter_by(ip_address=ip).
                                 with_lockmode('update').one())
             except sa_exc.NoResultFound:
                 gre_endpoint_id = self._generate_gre_endpoint_id(session)
-                gre_endpoint = self.GreEndpoints(ip, gre_endpoint_id)
+                gre_endpoint = GreEndpoints(ip, gre_endpoint_id)
                 session.add(gre_endpoint)
                 session.flush()
             return gre_endpoint
 
 
-class GreAllocation(model_base.BASEV2):
-
-    __tablename__ = 'ml2_gre_allocations'
-
-    gre_id = sa.Column(sa.Integer, nullable=False, primary_key=True,
-                       autoincrement=False)
-    allocated = sa.Column(sa.Boolean, nullable=False)
-
-    def __init__(self, gre_id):
-        self.gre_id = gre_id
-        self.allocated = False
-
-
-class GreEndpoints(model_base.BASEV2):
-    """Represents tunnel endpoint in RPC mode."""
-    __tablename__ = 'ml2_gre_endpoints'
-
-    ip_address = sa.Column(sa.String(64), primary_key=True)
-    id = sa.Column(sa.Integer, nullable=False)
-
-    def __init__(self, ip_address, id):
-        self.ip_address = ip_address
-        self.id = id
-
-    def __repr__(self):
-        return "<TunnelEndpoint(%s,%s)>" % (self.ip_address, self.id)
