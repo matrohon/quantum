@@ -148,7 +148,5 @@ class GreTypeTest(base.BaseTestCase):
     def test_add_endpoints(self):
         tun_1 = self.driver.add_endpoint('192.168.0.1')
         tun_2 = self.driver.add_endpoint('192.168.0.2')
-        self.assertEquals(1, tun_1.endpoint_id)
         self.assertEquals('192.168.0.1', tun_1.ip_address)
-        self.assertEquals(2, tun_2.endpoint_id)
         self.assertEquals('192.168.0.2', tun_2.ip_address)

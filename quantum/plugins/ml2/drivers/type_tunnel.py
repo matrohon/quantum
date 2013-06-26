@@ -75,8 +75,7 @@ class TunnelRpcCallbackMixin(object):
             entry = dict()
             entry['tunnels'] = tunnels
             # Notify all other listening agents
-            self.notifier.tunnel_update(rpc_context, tunnel.ip_address,
-                                        tunnel.endpoint_id)
+            self.notifier.tunnel_update(rpc_context, tunnel.ip_address)
             # Return the list of tunnels IP's to the agent
             return entry
         else:
@@ -91,9 +90,8 @@ class TunnelAgentRpcApiMixin(object):
                                      TUNNEL,
                                      topics.UPDATE)
 
-    def tunnel_update(self, context, tunnel_ip, tunnel_id):
+    def tunnel_update(self, context, tunnel_ip):
         self.fanout_cast(context,
                          self.make_msg('tunnel_update',
-                                       tunnel_ip=tunnel_ip,
-                                       tunnel_id=tunnel_id),
+                                       tunnel_ip=tunnel_ip),
                          topic=self._get_tunnel_update_topic())

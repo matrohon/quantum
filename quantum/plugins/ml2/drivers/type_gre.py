@@ -18,7 +18,6 @@ import sys
 from oslo.config import cfg
 import sqlalchemy as sa
 from sqlalchemy.orm import exc as sa_exc
-from sqlalchemy.sql import func
 
 from quantum.common import exceptions as exc
 from quantum.db import api as db_api
@@ -58,14 +57,12 @@ class GreEndpoints(model_base.BASEV2):
     __tablename__ = 'ml2_gre_endpoints'
 
     ip_address = sa.Column(sa.String(64), primary_key=True)
-    endpoint_id = sa.Column(sa.Integer, nullable=False)
 
-    def __init__(self, ip_address, endpoint_id):
+    def __init__(self, ip_address):
         self.ip_address = ip_address
-        self.endpoint_id = endpoint_id
 
     def __repr__(self):
-        return "<TunnelEndpoint(%s,%s)>" % (self.ip_address, self.id)
+        return "<TunnelEndpoint(%s)>" % (self.ip_address)
 
 
 class GreTypeDriver(api.TypeDriver,
@@ -216,14 +213,8 @@ class GreTypeDriver(api.TypeDriver,
 
         with session.begin(subtransactions=True):
             gre_endpoints = session.query(GreEndpoints)
-            return [{'id': gre_endpoint.endpoint_id,
-                     'ip_address': gre_endpoint.ip_address}
+            return [{'ip_address': gre_endpoint.ip_address}
                     for gre_endpoint in gre_endpoints]
-
-    def _generate_gre_endpoint_id(self, session):
-        max_tunnel_id = session.query(
-            func.max(GreEndpoints.endpoint_id)).scalar() or 0
-        return max_tunnel_id + 1
 
     def add_endpoint(self, ip):
         LOG.debug(_("add_gre_endpoint() called for ip %s"), ip)
@@ -233,9 +224,9 @@ class GreTypeDriver(api.TypeDriver,
                 gre_endpoint = (session.query(GreEndpoints).
                                 filter_by(ip_address=ip).
                                 with_lockmode('update').one())
+                LOG.warning(_("Gre endpoint with ip %s already exists"), ip)
             except sa_exc.NoResultFound:
-                gre_endpoint_id = self._generate_gre_endpoint_id(session)
-                gre_endpoint = GreEndpoints(ip, gre_endpoint_id)
+                gre_endpoint = GreEndpoints(ip)
                 session.add(gre_endpoint)
                 session.flush()
             return gre_endpoint
