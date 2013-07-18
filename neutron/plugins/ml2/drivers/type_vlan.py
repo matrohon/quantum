@@ -188,8 +188,6 @@ class VlanTypeDriver(api.TypeDriver):
                 msg = _("%s prohibited for VLAN provider network") % key
                 raise exc.InvalidInput(error_message=msg)
 
-        return segment
-
     def reserve_provider_segment(self, session, segment):
         physical_network = segment[api.PHYSICAL_NETWORK]
         vlan_id = segment[api.SEGMENTATION_ID]
