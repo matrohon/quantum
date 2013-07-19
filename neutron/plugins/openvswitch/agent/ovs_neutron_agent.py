@@ -169,7 +169,8 @@ class OVSNeutronAgent(sg_rpc.SecurityGroupAgentRpcCallbackMixin):
         self.int_br = self.setup_integration_br(integ_br)
         self.setup_physical_bridges(bridge_mappings)
         self.local_vlan_map = {}
-
+        self.tun_br_vxlan_ofport = []
+        self.tun_br_gre_ofport = []
         self.polling_interval = polling_interval
 
         if tunnel_types:
@@ -302,8 +303,31 @@ class OVSNeutronAgent(sg_rpc.SecurityGroupAgentRpcCallbackMixin):
         if tunnel_ip == self.local_ip:
             return
         tun_name = '%s-%s' % (tunnel_type, tunnel_id)
-        self.tun_br.add_tunnel_port(tun_name, tunnel_ip, tunnel_type,
-                                    self.vxlan_udp_port)
+        ofport = self.tun_br.add_tunnel_port(tun_name, tunnel_ip, tunnel_type,
+                                             self.vxlan_udp_port)
+        if tunnel_type == constants.TYPE_GRE:
+            self.tun_br_gre_ofport.append(ofport)
+
+        elif tunnel_type == constants.TYPE_VXLAN:
+            self.tun_br_vxlan_ofport.append(ofport)
+
+        for network_id, vlan_mapping in self.local_vlan_map.iteritems():
+            if vlan_mapping.network_type == constants.TYPE_GRE:
+                self.tun_br.add_flow(
+                        priority=3,
+                        in_port=ofport,
+                        tun_id=vlan_mapping.segmentation_id,
+                        dl_dst="01:00:00:00:00:00/01:00:00:00:00:00",
+                        actions="mod_vlan_vid:%s,output:%s" %
+                        (vlan_mapping.vlan, self.patch_int_ofport))
+            if vlan_mapping.network_type == constants.TYPE_VXLAN:
+                self.tun_br.add_flow(
+                        priority=3,
+                        in_port=ofport,
+                        tun_id=vlan_mapping.segmentation_id,
+                        dl_dst="01:00:00:00:00:00/01:00:00:00:00:00",
+                        actions="mod_vlan_vid:%s,output:%s" %
+                        (vlan_mapping.vlan, self.patch_int_ofport))
 
     def create_rpc_dispatcher(self):
         '''Get the rpc dispatcher for this manager.
@@ -337,18 +361,52 @@ class OVSNeutronAgent(sg_rpc.SecurityGroupAgentRpcCallbackMixin):
 
         if network_type in constants.TUNNEL_NETWORK_TYPES:
             if self.enable_tunneling:
-                # outbound
+                # outbound unicast
                 self.tun_br.add_flow(priority=4, in_port=self.patch_int_ofport,
                                      dl_vlan=lvid,
                                      actions="set_tunnel:%s,normal" %
                                      segmentation_id)
-                # inbound bcast/mcast
-                self.tun_br.add_flow(
-                    priority=3,
-                    tun_id=segmentation_id,
-                    dl_dst="01:00:00:00:00:00/01:00:00:00:00:00",
-                    actions="mod_vlan_vid:%s,output:%s" %
-                    (lvid, self.patch_int_ofport))
+                # bcast/mcast 
+                if  network_type == constants.TYPE_GRE:
+                    for ofport in self.tun_br_gre_ofport:
+                        #inbound
+                        self.tun_br.add_flow(
+                            priority=3,
+                            in_port=ofport,
+                            tun_id=segmentation_id,
+                            dl_dst="01:00:00:00:00:00/01:00:00:00:00:00",
+                            actions="mod_vlan_vid:%s,output:%s" %
+                            (lvid, self.patch_int_ofport))
+                    #outbound
+                    ofports=','.join(self.tun_br_gre_ofport)
+                    self.tun_br.add_flow(
+                        priority=4,
+                        in_port=self.patch_int_ofport,
+                        dl_vlan=lvid,
+                        tun_id=segmentation_id,
+                        dl_dst="01:00:00:00:00:00/01:00:00:00:00:00",
+                        actions="mod_vlan_vid:%s,output:%s" %
+                        (lvid, ofports))
+                elif network_type == constants.TYPE_VXLAN:
+                    for ofport in self.tun_br_vxlan_ofport:
+                        #inbound
+                        self.tun_br.add_flow(
+                            priority=3,
+                            in_port=ofport,
+                            tun_id=segmentation_id,
+                            dl_dst="01:00:00:00:00:00/01:00:00:00:00:00",
+                            actions="mod_vlan_vid:%s,output:%s" %
+                            (lvid, self.patch_int_ofport))
+                    #outbound
+                    ofports=','.join(self.tun_br_vxlan_ofport)
+                    self.tun_br.add_flow(
+                        priority=4,
+                        in_port=self.patch_int_ofport,
+                        dl_vlan=lvid,
+                        tun_id=segmentation_id,
+                        dl_dst="01:00:00:00:00:00/01:00:00:00:00:00",
+                        actions="mod_vlan_vid:%s,output:%s" %
+                        (lvid, ofports))
             else:
                 LOG.error(_("Cannot provision %(network_type)s network for "
                           "net-id=%(net_uuid)s - tunneling disabled"),
@@ -711,10 +769,14 @@ class OVSNeutronAgent(sg_rpc.SecurityGroupAgentRpcCallbackMixin):
                     if self.local_ip != tunnel['ip_address']:
                         tunnel_id = tunnel.get('id', tunnel['ip_address'])
                         tun_name = '%s-%s' % (tunnel_type, tunnel_id)
-                        self.tun_br.add_tunnel_port(tun_name,
-                                                    tunnel['ip_address'],
-                                                    tunnel_type,
-                                                    self.vxlan_udp_port)
+                        ofport = self.tun_br.add_tunnel_port(tun_name,
+                                                             tunnel['ip_address'],
+                                                             tunnel_type,
+                                                             self.vxlan_udp_port)
+                        if tunnel_type == constants.TYPE_GRE:
+                            self.tun_br_gre_ofport.append(ofport)
+                        elif tunnel_type == constants.TYPE_VXLAN:
+                            self.tun_br_vxlan_ofport.append(ofport)
         except Exception as e:
             LOG.debug(_("Unable to sync tunnel IP %(local_ip)s: %(e)s"),
                       {'local_ip': self.local_ip, 'e': e})
