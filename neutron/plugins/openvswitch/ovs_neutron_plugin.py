@@ -52,6 +52,7 @@ from neutron.extensions import allowedaddresspairs as addr_pair
 from neutron.extensions import extra_dhcp_opt as edo_ext
 from neutron.extensions import portbindings
 from neutron.extensions import providernet as provider
+from neutron import manager
 from neutron.openstack.common import importutils
 from neutron.openstack.common import log as logging
 from neutron.openstack.common import rpc
@@ -123,12 +124,19 @@ class OVSRpcCallbacks(dhcp_rpc_base.DhcpRpcCallbackMixin,
 
     def update_device_down(self, rpc_context, **kwargs):
         """Device no longer exists on agent."""
-        # TODO(garyk) - live migration and port status
         agent_id = kwargs.get('agent_id')
         device = kwargs.get('device')
+        host = kwargs.get('host')
+        port = ovs_db_v2.get_port(device)
         LOG.debug(_("Device %(device)s no longer exists on %(agent_id)s"),
                   {'device': device, 'agent_id': agent_id})
-        port = ovs_db_v2.get_port(device)
+        plugin = manager.NeutronManager.get_plugin()
+        if (host and not plugin.get_port_host(rpc_context, port['id'])==host):
+            LOG.debug(_("Device %(device)s not bound to the"
+                        " agent host %(host)s"),
+                      {'device': device, 'host': host})
+            return {'device': device,
+                    'exists': True}
         if port:
             entry = {'device': device,
                      'exists': True}
@@ -145,9 +153,16 @@ class OVSRpcCallbacks(dhcp_rpc_base.DhcpRpcCallbackMixin,
         """Device is up on agent."""
         agent_id = kwargs.get('agent_id')
         device = kwargs.get('device')
+        host = kwargs.get('host')
+        port = ovs_db_v2.get_port(device)
         LOG.debug(_("Device %(device)s up on %(agent_id)s"),
                   {'device': device, 'agent_id': agent_id})
-        port = ovs_db_v2.get_port(device)
+        plugin = manager.NeutronManager.get_plugin()
+        if (host and not plugin.get_port_host(rpc_context, port['id'])==host):
+            LOG.debug(_("Device %(device)s not bound to the"
+                        " agent host %(host)s"),
+                      {'device': device, 'host': host})
+            return
         if port:
             if port['status'] != q_const.PORT_STATUS_ACTIVE:
                 ovs_db_v2.set_port_status(port['id'],
