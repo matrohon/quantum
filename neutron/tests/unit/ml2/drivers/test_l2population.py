@@ -81,6 +81,8 @@ class TestL2PopulationRpcTestCase(test_plugin.NeutronDbPluginV2TestCase):
                                      ['openvswitch', 'linuxbridge',
                                       'l2population'],
                                      'ml2')
+        config.cfg.CONF.set_override('debug',
+                                     'True')
         super(TestL2PopulationRpcTestCase, self).setUp(PLUGIN_NAME)
         self.addCleanup(config.cfg.CONF.reset)
         self.port_create_status = 'DOWN'
@@ -483,3 +485,126 @@ class TestL2PopulationRpcTestCase(test_plugin.NeutronDbPluginV2TestCase):
 
                 self.mock_fanout.assert_any_call(
                     mock.ANY, del_expected, topic=self.fanout_topic)
+
+    def test_host_changed(self):
+        self._register_ml2_agents()
+
+        with self.subnet(network=self._network) as subnet:
+            host_arg = {portbindings.HOST_ID: HOST}
+            with self.port(subnet=subnet, cidr='10.0.0.0/24',
+                           arg_list=(portbindings.HOST_ID,),
+                           **host_arg) as port1:
+
+                    # only one port moved to a new host, no other port exists
+                    # on any host
+                    p1 = port1['port']
+
+                    data = {'port': {'binding:host_id': L2_AGENT_2['host']}}
+
+                    req = self.new_update_request('ports', data, p1['id'])
+                    res = self.deserialize(self.fmt, req.get_response(self.api))
+                    upd_expected = {'args':
+                                    {'fdb_entries':
+                                     {'chg_host':
+                                      {p1['network_id']:
+                                       {'ports':
+                                           {'before':
+                                            { L2_AGENT['configurations']
+                                             ['tunneling_ip']:
+                                             [[p1['mac_address'],'10.0.0.2'],
+                                              constants.FLOODING_ENTRY
+                                              ]
+                                             },
+                                            'after':
+                                            { L2_AGENT_2['configurations']
+                                             ['tunneling_ip']:
+                                             [[p1['mac_address'],'10.0.0.2'],
+                                              constants.FLOODING_ENTRY]
+                                             }}}}}},
+                                    'namespace': None,
+                                    'method': 'update_fdb_entries'}
+
+                    self.mock_fanout.assert_any_call(
+                        mock.ANY, upd_expected, topic=self.fanout_topic)
+
+                    self.mock_fanout.reset_mock()
+
+                    with self.port(subnet=subnet, cidr='10.0.0.0/24',
+                               arg_list=(portbindings.HOST_ID,),
+                               **host_arg) as port2:
+                        # one port moved to a host that already hosts a port
+                        # of that network. The previous host has no more port 
+                        # on this network
+                        p2 = port2['port']
+
+                        data = {'port': {'binding:host_id': L2_AGENT_2['host']}}
+  
+                        req = self.new_update_request('ports', data, p2['id'])
+                        res = self.deserialize(self.fmt,
+                                               req.get_response(self.api))
+                        upd_expected = {'args':
+                                        {'fdb_entries':
+                                         {'chg_host':
+                                          {p2['network_id']:
+                                           {'ports':
+                                               {'before':
+                                                { L2_AGENT['configurations']
+                                                 ['tunneling_ip']:
+                                                 [[p2['mac_address'],
+                                                   '10.0.0.3'],
+                                                  constants.FLOODING_ENTRY
+                                                  ]
+                                                 },
+                                                'after':
+                                                { L2_AGENT_2['configurations']
+                                                 ['tunneling_ip']:
+                                                 [[p2['mac_address'],
+                                                   '10.0.0.3']]
+                                                 }}}}}},
+                                        'namespace': None,
+                                        'method': 'update_fdb_entries'}
+                        self.mock_fanout.assert_any_call(
+                            mock.ANY, upd_expected, topic=self.fanout_topic)
+
+                        self.mock_fanout.reset_mock()
+
+                        self.mock_fanout.reset_mock()
+                        with self.port(subnet=subnet, cidr='10.0.0.0/24',
+                                       arg_list=(portbindings.HOST_ID,),
+                                       **host_arg) as port3:
+                            # one port added to host1. Port2 will move back to
+                            # host 1, while every host has already a port on the 
+                            # network
+                            p3 = port3['port']
+
+                            data = {'port': {'binding:host_id':
+                                             L2_AGENT['host']}}
+
+                            req = self.new_update_request('ports',
+                                                          data, p2['id'])
+                            res = self.deserialize(self.fmt,
+                                                   req.get_response(self.api))
+                            upd_expected = {'args':
+                                            {'fdb_entries':
+                                             {'chg_host':
+                                              {p2['network_id']:
+                                               {'ports':
+                                                   {'before':
+                                                    { L2_AGENT_2
+                                                     ['configurations']
+                                                     ['tunneling_ip']:
+                                                     [[p2['mac_address'],
+                                                       '10.0.0.3']]
+                                                     },
+                                                    'after':
+                                                    { L2_AGENT
+                                                     ['configurations']
+                                                     ['tunneling_ip']:
+                                                     [[p2['mac_address'],
+                                                       '10.0.0.3']]
+                                                     }}}}}},
+                                            'namespace': None,
+                                            'method': 'update_fdb_entries'}
+                            self.mock_fanout.assert_any_call(
+                                mock.ANY, upd_expected, topic=self.fanout_topic)
+
