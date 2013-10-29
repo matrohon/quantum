@@ -575,31 +575,25 @@ class LinuxBridgeManager:
                       root_helper=self.root_helper,
                       check_exit_code=False)
 
+    def add_fdb_bridge_flooding_entry(self, mac, agent_ip, interface):
+        if self.vxlan_mode == lconst.VXLAN_UCAST:
+            if self.fdb_bridge_entry_exists(mac, interface):
+                self.add_fdb_bridge_entry(mac, agent_ip, interface,
+                                          "append")
+            else:
+                self.add_fdb_bridge_entry(mac, agent_ip, interface)
+
+    def remove_fdb_flooding_entry(self, mac, agent_ip, interface):
+        if self.vxlan_mode == lconst.VXLAN_UCAST:
+            self.remove_fdb_bridge_entry(mac, agent_ip, interface)
+
     def remove_fdb_bridge_entry(self, mac, agent_ip, interface):
         utils.execute(['bridge', 'fdb', 'del', mac, 'dev', interface,
                        'dst', agent_ip],
                       root_helper=self.root_helper,
                       check_exit_code=False)
 
-    def add_fdb_entries(self, agent_ip, ports, interface):
-        for mac, ip in ports:
-            if mac != constants.FLOODING_ENTRY[0]:
-                self.add_fdb_ip_entry(mac, ip, interface)
-                self.add_fdb_bridge_entry(mac, agent_ip, interface)
-            elif self.vxlan_mode == lconst.VXLAN_UCAST:
-                if self.fdb_bridge_entry_exists(mac, interface):
-                    self.add_fdb_bridge_entry(mac, agent_ip, interface,
-                                              "append")
-                else:
-                    self.add_fdb_bridge_entry(mac, agent_ip, interface)
 
-    def remove_fdb_entries(self, agent_ip, ports, interface):
-        for mac, ip in ports:
-            if mac != constants.FLOODING_ENTRY[0]:
-                self.remove_fdb_ip_entry(mac, ip, interface)
-                self.remove_fdb_bridge_entry(mac, agent_ip, interface)
-            elif self.vxlan_mode == lconst.VXLAN_UCAST:
-                self.remove_fdb_bridge_entry(mac, agent_ip, interface)
 
 
 class LinuxBridgeRpcCallbacks(sg_rpc.SecurityGroupAgentRpcCallbackMixin,
@@ -687,13 +681,19 @@ class LinuxBridgeRpcCallbacks(sg_rpc.SecurityGroupAgentRpcCallbackMixin,
                 segment.segmentation_id)
 
             agent_ports = values.get('ports')
+            br_mgr = self.agent.br_mgr
             for agent_ip, ports in agent_ports.items():
                 if agent_ip == self.agent.br_mgr.local_ip:
                     continue
 
-                self.agent.br_mgr.add_fdb_entries(agent_ip,
-                                                  ports,
-                                                  interface)
+                for mac, ip in ports:
+                    if mac != constants.FLOODING_ENTRY[0]:
+                        br_mgr.add_fdb_ip_entry(mac, ip, interface)
+                        br_mgr.add_fdb_bridge_entry(mac, agent_ip, interface)
+                    else:
+                        br_mgr.add_fdb_bridge_flooding_entry(mac,
+                                                                agent_ip,
+                                                             interface)
 
     def fdb_remove(self, context, fdb_entries):
         LOG.debug(_("fdb_remove received"))
@@ -709,13 +709,21 @@ class LinuxBridgeRpcCallbacks(sg_rpc.SecurityGroupAgentRpcCallbackMixin,
                 segment.segmentation_id)
 
             agent_ports = values.get('ports')
+            br_mgr = self.agent.br_mgr
             for agent_ip, ports in agent_ports.items():
                 if agent_ip == self.agent.br_mgr.local_ip:
                     continue
 
-                self.agent.br_mgr.remove_fdb_entries(agent_ip,
-                                                     ports,
-                                                     interface)
+                for mac, ip in ports:
+                    if mac != constants.FLOODING_ENTRY[0]:
+                        br_mgr.remove_fdb_ip_entry(mac, ip, interface)
+                        br_mgr.remove_fdb_bridge_entry(mac,
+                                                       agent_ip,
+                                                       interface)
+                    else:
+                        br_mgr.remove_fdb_flooding_entry(mac,
+                                                       agent_ip,
+                                                       interface)
 
     def _fdb_chg_ip(self, context, fdb_entries):
         LOG.debug(_("update chg_ip received"))
@@ -741,6 +749,44 @@ class LinuxBridgeRpcCallbacks(sg_rpc.SecurityGroupAgentRpcCallbackMixin,
                 before = state.get('before')
                 for mac, ip in before:
                     self.agent.br_mgr.remove_fdb_ip_entry(mac, ip, interface)
+
+    def _fdb_chg_host(self, context, fdb_entries):
+        LOG.debug(_("update chg_host received"))
+        for network_id, values in fdb_entries.items():
+            segment = self.agent.br_mgr.network_map.get(network_id)
+            if not segment:
+                return
+
+            if segment.network_type != lconst.TYPE_VXLAN:
+                return
+
+            interface = self.agent.br_mgr.get_vxlan_device_name(
+                segment.segmentation_id)
+
+            agent_ports = values.get('ports')
+            br_mgr = self.agent.br_mgr
+
+            after = agent_ports.get('after')
+            for agent_ip, fdb_ip_entries in after.items():
+                for mac, ip in fdb_ip_entries:
+                    if mac != constants.FLOODING_ENTRY[0]:
+                        br_mgr.add_fdb_bridge_entry(mac, agent_ip, interface)
+                    else:
+                        br_mgr.add_fdb_bridge_flooding_entry(mac,
+                                                           agent_ip,
+                                                           interface)
+
+            before = agent_ports.get('before')
+            for agent_ip, fdb_ip_entries in before.items():
+                for mac, ip in fdb_ip_entries:
+                    if mac != constants.FLOODING_ENTRY[0]:
+                        br_mgr.remove_fdb_bridge_entry(mac,
+                                                       agent_ip,
+                                                       interface)
+                    else:
+                        br_mgr.remove_fdb_bridge_flooding_entry(mac,
+                                                                agent_ip,
+                                                                interface)
 
     def fdb_update(self, context, fdb_entries):
         LOG.debug(_("fdb_update received"))
