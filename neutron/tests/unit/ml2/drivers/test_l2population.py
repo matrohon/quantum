@@ -82,6 +82,8 @@ class TestL2PopulationRpcTestCase(test_plugin.NeutronDbPluginV2TestCase):
                                      ['openvswitch', 'linuxbridge',
                                       'l2population'],
                                      'ml2')
+        config.cfg.CONF.set_override('debug',
+                                     'True')
         super(TestL2PopulationRpcTestCase, self).setUp(PLUGIN_NAME)
         self.addCleanup(config.cfg.CONF.reset)
 
@@ -138,115 +140,74 @@ class TestL2PopulationRpcTestCase(test_plugin.NeutronDbPluginV2TestCase):
         callback.report_state(self.adminContext,
                               agent_state={'agent_state': L2_AGENT_3},
                               time=timeutils.strtime())
+    """
+    def _fdb_entries_exists(self, mock_arg_list):
+        for item in mock_arg_list:
+            call = item[1]
+            args, kwargs = call
+            print "args of call : ", args
+            print "kwargs of call : ", kwargs
+            if ('fdb_entries' in args[1]['args']):
+                return True
+        return False
+    """
 
-    def test_fdb_add_called(self):
+    def test_port_up_down_delete(self):
+        # TODO : find the way to way to assert that no fanout with fdb_entries 
+        # is called.
+        # self.assertFalse(self.mock_fanout.called) doesn't work since 
+        # security_group fanout is sent when a port is created of deleted  
         self._register_ml2_agents()
-
-        with self.subnet(network=self._network) as subnet:
-            host_arg = {portbindings.HOST_ID: HOST}
-            with self.port(subnet=subnet,
-                           arg_list=(portbindings.HOST_ID,),
-                           **host_arg) as port1:
-                with self.port(subnet=subnet,
-                               arg_list=(portbindings.HOST_ID,),
-                               **host_arg):
-                    p1 = port1['port']
-
-                    device = 'tap' + p1['id']
-
-                    self.mock_fanout.reset_mock()
-                    self.callbacks.update_device_up(self.adminContext,
-                                                    agent_id=HOST,
-                                                    device=device)
-
-                    p1_ips = [p['ip_address'] for p in p1['fixed_ips']]
-                    expected = {'args':
-                                {'fdb_entries':
-                                 {p1['network_id']:
-                                  {'ports':
-                                   {'20.0.0.1': [[p1['mac_address'],
-                                                  p1_ips[0]]]},
-                                   'network_type': 'vxlan',
-                                   'segment_id': 1}}},
-                                'namespace': None,
-                                'method': 'add_fdb_entries'}
-
-                    self.mock_fanout.assert_called_with(
-                        mock.ANY, expected, topic=self.fanout_topic)
-
-    def test_fdb_add_not_called_type_local(self):
-        self._register_ml2_agents()
-
-        with self.subnet(network=self._network) as subnet:
-            host_arg = {portbindings.HOST_ID: HOST + '_3'}
-            with self.port(subnet=subnet,
-                           arg_list=(portbindings.HOST_ID,),
-                           **host_arg) as port1:
-                with self.port(subnet=subnet,
-                               arg_list=(portbindings.HOST_ID,),
-                               **host_arg):
-                    p1 = port1['port']
-
-                    device = 'tap' + p1['id']
-
-                    self.mock_fanout.reset_mock()
-                    self.callbacks.update_device_up(self.adminContext,
-                                                    agent_id=HOST,
-                                                    device=device)
-
-                    self.assertFalse(self.mock_fanout.called)
-
-    def test_fdb_add_two_agents(self):
-        self._register_ml2_agents()
-
         with self.subnet(network=self._network) as subnet:
             host_arg = {portbindings.HOST_ID: HOST,
                         'admin_state_up': True}
             with self.port(subnet=subnet,
                            arg_list=(portbindings.HOST_ID, 'admin_state_up',),
                            **host_arg) as port1:
-                host_arg = {portbindings.HOST_ID: HOST + '_2',
+                host2_arg = {portbindings.HOST_ID: L2_AGENT_2["host"],
                             'admin_state_up': True}
                 with self.port(subnet=subnet,
                                arg_list=(portbindings.HOST_ID,
                                          'admin_state_up',),
-                               **host_arg) as port2:
-                    p1 = port1['port']
-                    p2 = port2['port']
+                               **host2_arg) as port2:
+                    #Adding port that are down on the net :
+                    #assert that no fanout or cast has been sent
+                    #TODO : test that no fanout with fdb_entries is sent
+                    #self.assertFalse(self.mock_fanout.called)
+                    self.assertFalse(self.mock_cast.called)
 
-                    device = 'tap' + p1['id']
+
+                    #Bringing a first port up on agent
+                    #no fanout and no cast should be sent
+                    p1 = port1['port']
+                    device1 = 'tap' + p1['id']
 
                     self.mock_cast.reset_mock()
                     self.mock_fanout.reset_mock()
                     self.callbacks.update_device_up(self.adminContext,
                                                     agent_id=HOST,
-                                                    device=device)
+                                                    device=device1)
 
+
+                    self.assertFalse(self.mock_fanout.called)
+                    self.assertFalse(self.mock_cast.called)
+
+
+                    #Bringing a second port up on another agent
+                    #assert that fanout and cast has been sent with Flooding 
+                    #entries
+                    p2 = port2['port']
+                    device2 = 'tap' + p2['id']
+
+                    self.mock_cast.reset_mock()
+                    self.mock_fanout.reset_mock()
+                    self.callbacks.update_device_up(self.adminContext,
+                                                    agent_id=L2_AGENT_2["host"],
+                                                    device=device2)
                     p1_ips = [p['ip_address'] for p in p1['fixed_ips']]
                     p2_ips = [p['ip_address'] for p in p2['fixed_ips']]
 
                     expected1 = {'args':
-                                 {'fdb_entries':
-                                  {p1['network_id']:
-                                   {'ports':
-                                    {'20.0.0.2': [constants.FLOODING_ENTRY,
-                                                  [p2['mac_address'],
-                                                   p2_ips[0]]]},
-                                    'network_type': 'vxlan',
-                                    'segment_id': 1}}},
-                                 'namespace': None,
-                                 'method': 'add_fdb_entries'}
-
-                    topic = topics.get_topic_name(topics.AGENT,
-                                                  topics.L2POPULATION,
-                                                  topics.UPDATE,
-                                                  HOST)
-
-                    self.mock_cast.assert_called_with(mock.ANY,
-                                                      expected1,
-                                                      topic=topic)
-
-                    expected2 = {'args':
                                  {'fdb_entries':
                                   {p1['network_id']:
                                    {'ports':
@@ -258,10 +219,215 @@ class TestL2PopulationRpcTestCase(test_plugin.NeutronDbPluginV2TestCase):
                                  'namespace': None,
                                  'method': 'add_fdb_entries'}
 
+                    topic = topics.get_topic_name(topics.AGENT,
+                              topics.L2POPULATION,
+                              topics.UPDATE,
+                              L2_AGENT_2["host"])
+                    self.mock_cast.assert_called_with(mock.ANY,
+                                                      expected1,
+                                                      topic=topic)
+
+                    expected2 = {'args':
+                                 {'fdb_entries':
+                                  {p1['network_id']:
+                                   {'ports':
+                                    {'20.0.0.2': [constants.FLOODING_ENTRY,
+                                                  [p2['mac_address'],
+                                                   p2_ips[0]]]},
+                                    'network_type': 'vxlan',
+                                    'segment_id': 1}}},
+                                 'namespace': None,
+                                 'method': 'add_fdb_entries'}
+
+ 
+
                     self.mock_fanout.assert_called_with(
                         mock.ANY, expected2, topic=self.fanout_topic)
 
-    def test_fdb_add_called_two_networks(self):
+                    #Bringing a third port up on an agent that already hosts 
+                    #a port of this net, and another port up of this net is 
+                    #on onother agent
+                    #assert that fanouty withoiut flooding entries is sent
+                    #assert that no cast is sent
+                    with self.port(subnet=subnet,
+                                   arg_list=(portbindings.HOST_ID,
+                                             'admin_state_up',),
+                                   **host_arg) as port3:
+                        p3 = port3['port']
+                        device3 = 'tap' + p3['id']
+
+                        p3_ips = [p['ip_address'] for p in p3['fixed_ips']]
+
+                        self.mock_cast.reset_mock()
+                        self.mock_fanout.reset_mock()
+
+                        self.callbacks.update_device_up(self.adminContext,
+                                                        agent_id=HOST,
+                                                        device=device3)
+                        expected3 = {'args':
+                                 {'fdb_entries':
+                                  {p1['network_id']:
+                                   {'ports':
+                                    {'20.0.0.1': [[p3['mac_address'],
+                                                   p3_ips[0]]]},
+                                    'network_type': 'vxlan',
+                                    'segment_id': 1}}},
+                                 'namespace': None,
+                                 'method': 'add_fdb_entries'}
+                        self.mock_fanout.assert_called_with(
+                            mock.ANY, expected3, topic=self.fanout_topic)
+                        self.assertFalse(self.mock_cast.called)
+
+                        #Bringing the third port down
+                        #assert that a fanout cast is sent without flooding 
+                        #entries
+                        expected3_del = {'args':
+                                 {'fdb_entries':
+                                  {p1['network_id']:
+                                   {'ports':
+                                    {'20.0.0.1': [[p3['mac_address'],
+                                                   p3_ips[0]]]},
+                                    'network_type': 'vxlan',
+                                    'segment_id': 1}}},
+                                 'namespace': None,
+                                 'method': 'remove_fdb_entries'}
+
+                        self.mock_fanout.reset_mock()
+                        self.callbacks.update_device_down(self.adminContext,
+                                                          agent_id=HOST,
+                                                          device=device3)
+                        self.mock_fanout.assert_called_with(
+                            mock.ANY, expected3_del, topic=self.fanout_topic)
+
+                        #Bringing the third port up and delete it
+                        #assert that a fanout cast is sent without flooding 
+                        #entries
+                        self.callbacks.update_device_up(self.adminContext,
+                                                        agent_id=HOST,
+                                                        device=device3)
+                        self.mock_fanout.reset_mock()
+
+                    self.mock_fanout.assert_any_call(
+                        mock.ANY, expected3_del, topic=self.fanout_topic)
+
+                    #Bringing the second port down, which is the last port
+                    #on the agent
+                    #assert that fanout has been sent with flooding entries
+                    self.mock_fanout.reset_mock()
+                    self.callbacks.update_device_down(self.adminContext,
+                                                      agent_id=L2_AGENT_2["host"],
+                                                      device=device2)
+
+                    expected2_del = {'args':
+                                     {'fdb_entries':
+                                      {p1['network_id']:
+                                       {'ports':
+                                        {'20.0.0.2': [constants.FLOODING_ENTRY,
+                                                      [p2['mac_address'],
+                                                       p2_ips[0]]]},
+                                        'network_type': 'vxlan',
+                                        'segment_id': 1}}},
+                                     'namespace': None,
+                                     'method': 'remove_fdb_entries'}
+
+
+                    self.mock_fanout.assert_any_call(
+                        mock.ANY, expected2_del, topic=self.fanout_topic)
+
+                    #Bringing the second port up and delete it
+                    #assert that fanout has been sent with flooding entries
+                    self.callbacks.update_device_up(self.adminContext,
+                                                    agent_id=L2_AGENT_2["host"],
+                                                    device=device2)
+                    self.mock_fanout.reset_mock()
+
+                self.mock_fanout.assert_any_call(
+                    mock.ANY, expected2_del, topic=self.fanout_topic)
+
+                #Bringing the first port down, which is the last port
+                #on the net
+                #assert that no fanout is sent
+                self.mock_fanout.reset_mock()
+                self.callbacks.update_device_down(self.adminContext,
+                                                  agent_id=HOST,
+                                                  device=device1)
+                self.assertFalse(self.mock_fanout.called)
+
+                #Bringing the first port up and delete it
+                #assert that no fanout is sent
+                self.callbacks.update_device_up(self.adminContext,
+                                                agent_id=HOST,
+                                                device=device1)
+                self.mock_fanout.reset_mock()
+
+            #TODO : test that no fanout with fdb_entries is sent
+            #self.assertFalse(self.mock_fanout.called)
+    """
+    try:
+        self.mock_fanout.assert_any_call(
+            mock.ANY, expected, topic=self.fanout_topic)
+    except AssertionError:
+        print "fanout args list : ", self.mock_fanout.call_args_list
+        raise
+    """
+
+    def test_port_up_down_delete_called_every_ports_on_the_same_agent(self):
+        self._register_ml2_agents()
+
+        with self.subnet(network=self._network) as subnet:
+            host_arg = {portbindings.HOST_ID: HOST}
+            with self.port(subnet=subnet,
+                           arg_list=(portbindings.HOST_ID,),
+                           **host_arg) as port1:
+                with self.port(subnet=subnet,
+                               arg_list=(portbindings.HOST_ID,),
+                               **host_arg) as port2:
+                    p1 = port1['port']
+                    device1 = 'tap' + p1['id']
+
+                    self.callbacks.update_device_up(self.adminContext,
+                                                    agent_id=HOST,
+                                                    device=device1)
+
+                    p2 = port2['port']
+                    device2 = 'tap' + p2['id']
+
+                    #Bringing the second port up
+                    #Assert no rpc is sent
+                    self.mock_fanout.reset_mock()
+                    self.mock_cast.reset_mock()
+                    self.callbacks.update_device_up(self.adminContext,
+                                                    agent_id=HOST,
+                                                    device=device2)
+
+                    self.assertFalse(self.mock_fanout.called)
+                    self.assertFalse(self.mock_cast.called)
+
+                    #Bringing the second port down
+                    #Assert no rpc is sent
+                    self.mock_fanout.reset_mock()
+                    self.mock_cast.reset_mock()
+                    self.callbacks.update_device_down(self.adminContext,
+                                                      agent_id=HOST,
+                                                      device=device2)
+
+                    self.assertFalse(self.mock_fanout.called)
+                    self.assertFalse(self.mock_cast.called)
+
+                    #Bringing the second port down and delete it
+                    #Assert no rpc is sent
+
+                    self.callbacks.update_device_up(self.adminContext,
+                                                    agent_id=HOST,
+                                                    device=device2)
+                    self.mock_fanout.reset_mock()
+                    self.mock_cast.reset_mock()
+
+                self.assertFalse(self.mock_cast.called)
+                #TODO : test that no fanout with fdb_entries is sent
+                #self.assertFalse(self.mock_fanout.called)
+
+    def test_port_up_called_two_networks(self):
         self._register_ml2_agents()
 
         with self.subnet(network=self._network) as subnet:
@@ -278,15 +444,20 @@ class TestL2PopulationRpcTestCase(test_plugin.NeutronDbPluginV2TestCase):
                                        arg_list=(portbindings.HOST_ID,),
                                        **host_arg) as port3:
                             p1 = port1['port']
-                            p3 = port3['port']
+                            device1 = 'tap' + p1['id']
 
-                            device = 'tap' + p3['id']
+                            p3 = port3['port']
+                            device3 = 'tap' + p3['id']
+
+                            self.callbacks.update_device_up(
+                                self.adminContext, agent_id=HOST,
+                                device=device1)
 
                             self.mock_cast.reset_mock()
                             self.mock_fanout.reset_mock()
                             self.callbacks.update_device_up(
                                 self.adminContext, agent_id=HOST,
-                                device=device)
+                                device=device3)
 
                             p1_ips = [p['ip_address']
                                       for p in p1['fixed_ips']]
@@ -331,113 +502,43 @@ class TestL2PopulationRpcTestCase(test_plugin.NeutronDbPluginV2TestCase):
                                 mock.ANY, expected2,
                                 topic=self.fanout_topic)
 
-    def test_fdb_remove_called_from_rpc(self):
+    def test_delete_port_down_called(self):
+        """
+        Test the deletion of a port that is down.
+        No fanout should be sent
+        """ 
         self._register_ml2_agents()
 
         with self.subnet(network=self._network) as subnet:
             host_arg = {portbindings.HOST_ID: HOST}
+            host2_arg = {portbindings.HOST_ID: L2_AGENT_2["host"]}
             with self.port(subnet=subnet,
                            arg_list=(portbindings.HOST_ID,),
-                           **host_arg):
+                           **host_arg) as port1:
                 with self.port(subnet=subnet,
                                arg_list=(portbindings.HOST_ID,),
-                               **host_arg) as port:
-                    p1 = port['port']
+                               **host2_arg) as port2:
+                    with self.port(subnet=subnet,
+                                   arg_list=(portbindings.HOST_ID,),
+                                   **host_arg) as port3:
 
-                    device = 'tap' + p1['id']
+                        p1 = port1['port']
+                        device1 = 'tap' + p1['id']
+                        self.callbacks.update_device_up(self.adminContext,
+                                                        agent_id=HOST,
+                                                        device=device1)
+                        p2 = port2['port']
+                        device2 = 'tap' + p2['id']
+                        self.callbacks.update_device_up(self.adminContext,
+                                                        agent_id=L2_AGENT_2["host"],
+                                                        device=device2)
+                        p3 = port3['port']
 
-                    self.mock_fanout.reset_mock()
-                    self.callbacks.update_device_up(self.adminContext,
-                                                    agent_id=HOST,
-                                                    device=device)
+                        self.mock_fanout.reset_mock()
 
-                    self.callbacks.update_device_down(self.adminContext,
-                                                      agent_id=HOST,
-                                                      device=device)
+                    #TODO : test that no fanout with fdb_entries is sent
+                    #self.assertFalse(self.mock_fanout.called)
 
-                    p1_ips = [p['ip_address'] for p in p1['fixed_ips']]
-                    expected = {'args':
-                                {'fdb_entries':
-                                 {p1['network_id']:
-                                  {'ports':
-                                   {'20.0.0.1': [[p1['mac_address'],
-                                                  p1_ips[0]]]},
-                                   'network_type': 'vxlan',
-                                   'segment_id': 1}}},
-                                'namespace': None,
-                                'method': 'remove_fdb_entries'}
-
-                    self.mock_fanout.assert_called_with(
-                        mock.ANY, expected, topic=self.fanout_topic)
-
-    def test_fdb_remove_called(self):
-        self._register_ml2_agents()
-
-        with self.subnet(network=self._network) as subnet:
-            host_arg = {portbindings.HOST_ID: HOST}
-            with self.port(subnet=subnet,
-                           arg_list=(portbindings.HOST_ID,),
-                           **host_arg):
-
-                with self.port(subnet=subnet,
-                               arg_list=(portbindings.HOST_ID,),
-                               **host_arg) as port:
-                    p1 = port['port']
-
-                    device = 'tap' + p1['id']
-
-                    self.mock_fanout.reset_mock()
-                    self.callbacks.update_device_up(self.adminContext,
-                                                    agent_id=HOST,
-                                                    device=device)
-
-                p1_ips = [p['ip_address'] for p in p1['fixed_ips']]
-                expected = {'args':
-                            {'fdb_entries':
-                             {p1['network_id']:
-                              {'ports':
-                               {'20.0.0.1': [[p1['mac_address'],
-                                              p1_ips[0]]]},
-                               'network_type': 'vxlan',
-                               'segment_id': 1}}},
-                            'namespace': None,
-                            'method': 'remove_fdb_entries'}
-
-                self.mock_fanout.assert_any_call(
-                    mock.ANY, expected, topic=self.fanout_topic)
-
-    def test_fdb_remove_called_last_port(self):
-        self._register_ml2_agents()
-
-        with self.subnet(network=self._network) as subnet:
-            host_arg = {portbindings.HOST_ID: HOST}
-
-            with self.port(subnet=subnet,
-                           arg_list=(portbindings.HOST_ID,),
-                           **host_arg) as port:
-                p1 = port['port']
-
-                device = 'tap' + p1['id']
-
-                self.callbacks.update_device_up(self.adminContext,
-                                                agent_id=HOST,
-                                                device=device)
-
-            p1_ips = [p['ip_address'] for p in p1['fixed_ips']]
-            expected = {'args':
-                        {'fdb_entries':
-                         {p1['network_id']:
-                          {'ports':
-                           {'20.0.0.1': [constants.FLOODING_ENTRY,
-                                         [p1['mac_address'],
-                                          p1_ips[0]]]},
-                           'network_type': 'vxlan',
-                           'segment_id': 1}}},
-                        'namespace': None,
-                        'method': 'remove_fdb_entries'}
-
-            self.mock_fanout.assert_any_call(
-                mock.ANY, expected, topic=self.fanout_topic)
 
     def test_fixed_ips_changed(self):
         self._register_ml2_agents()
@@ -550,3 +651,132 @@ class TestL2PopulationRpcTestCase(test_plugin.NeutronDbPluginV2TestCase):
 
                 self.assertFalse(mock_fanout.called)
                 fanout_patch.stop()
+
+    def test_host_changed(self):
+        self._register_ml2_agents()
+
+        with self.subnet(network=self._network) as subnet:
+            host_arg = {portbindings.HOST_ID: HOST}
+            with self.port(subnet=subnet, cidr='10.0.0.0/24',
+                           arg_list=(portbindings.HOST_ID,),
+                           **host_arg) as port1:
+                # only one port moved to a new host, no other port exists
+                # on any host
+                p1 = port1['port']
+
+                data = {'port': {'binding:host_id': L2_AGENT_2['host']}}
+
+                req = self.new_update_request('ports', data, p1['id'])
+                res = self.deserialize(self.fmt,
+                                       req.get_response(self.api))
+                self.assertEqual(res['port']['binding:host_id'],
+                                 L2_AGENT_2['host'])
+                upd_expected = {'args':
+                                {'fdb_entries':
+                                 {'chg_host':
+                                  {p1['network_id']:
+                                   {'ports':
+                                       {'before':
+                                        {L2_AGENT['configurations']
+                                         ['tunneling_ip']:
+                                         [[p1['mac_address'], '10.0.0.2'],
+                                          constants.FLOODING_ENTRY
+                                          ]
+                                         },
+                                        'after':
+                                        {L2_AGENT_2['configurations']
+                                         ['tunneling_ip']:
+                                         [[p1['mac_address'], '10.0.0.2'],
+                                          constants.FLOODING_ENTRY]
+                                         }}}}}},
+                                'namespace': None,
+                                'method': 'update_fdb_entries'}
+
+                self.mock_fanout.assert_any_call(
+                    mock.ANY, upd_expected, topic=self.fanout_topic)
+
+                self.mock_fanout.reset_mock()
+
+                with self.port(subnet=subnet, cidr='10.0.0.0/24',
+                               arg_list=(portbindings.HOST_ID,),
+                               **host_arg) as port2:
+                    # one port moved to a host that already hosts a port
+                    # of that network. The previous host has no more port
+                    # on this network
+                    p2 = port2['port']
+
+                    data = {'port':
+                            {'binding:host_id': L2_AGENT_2['host']}}
+
+                    req = self.new_update_request('ports', data, p2['id'])
+                    res = self.deserialize(self.fmt,
+                                           req.get_response(self.api))
+                    self.assertEqual(res['port']['binding:host_id'],
+                                     L2_AGENT_2['host'])
+                    upd_expected = {'args':
+                                    {'fdb_entries':
+                                     {'chg_host':
+                                      {p2['network_id']:
+                                       {'ports':
+                                           {'before':
+                                            {L2_AGENT['configurations']
+                                             ['tunneling_ip']:
+                                             [[p2['mac_address'],
+                                               '10.0.0.3'],
+                                              constants.FLOODING_ENTRY
+                                              ]
+                                             },
+                                            'after':
+                                            {L2_AGENT_2['configurations']
+                                             ['tunneling_ip']:
+                                             [[p2['mac_address'],
+                                               '10.0.0.3']]
+                                             }}}}}},
+                                    'namespace': None,
+                                    'method': 'update_fdb_entries'}
+                    self.mock_fanout.assert_any_call(
+                        mock.ANY, upd_expected, topic=self.fanout_topic)
+
+                    self.mock_fanout.reset_mock()
+
+                    self.mock_fanout.reset_mock()
+                    with self.port(subnet=subnet, cidr='10.0.0.0/24',
+                                   arg_list=(portbindings.HOST_ID,),
+                                   **host_arg):
+                        # one port added to host1. Port2 will move back to
+                        # host 1, while every host has already a port on
+                        # the network
+                        data = {'port': {'binding:host_id':
+                                         L2_AGENT['host']}}
+
+                        req = self.new_update_request('ports',
+                                                      data, p2['id'])
+                        res = self.deserialize(self.fmt,
+                                               req.get_response(self.api))
+                        self.assertEqual(res['port']['binding:host_id'],
+                                         L2_AGENT['host'])
+                        upd_expected = {'args':
+                                        {'fdb_entries':
+                                         {'chg_host':
+                                          {p2['network_id']:
+                                           {'ports':
+                                               {'before':
+                                                {L2_AGENT_2
+                                                 ['configurations']
+                                                 ['tunneling_ip']:
+                                                 [[p2['mac_address'],
+                                                   '10.0.0.3']]
+                                                 },
+                                                'after':
+                                                {L2_AGENT
+                                                 ['configurations']
+                                                 ['tunneling_ip']:
+                                                 [[p2['mac_address'],
+                                                   '10.0.0.3']]
+                                                 }}}}}},
+                                        'namespace': None,
+                                        'method': 'update_fdb_entries'}
+                        self.mock_fanout.assert_any_call(
+                            mock.ANY,
+                            upd_expected,
+                            topic=self.fanout_topic)
